@@ -123,7 +123,7 @@ async function getUserRoleSlug() {
   const res = await sb.auth.getUser();
   const user = res?.data?.user;
   const raw = user?.user_metadata?.role ?? user?.user_metadata?.roles; // admite "role" o "roles[]"
-  const priority = ['socio_fundador','socio_mayorista','socio','asociado','abogado_asociado','cliente'];
+  const priority = ['admin','socio_fundador','socio_mayorista','socio','asociado','abogado_asociado','cliente'];
 
   if (Array.isArray(raw)) {
     const slugs = raw.map(r => ROLE_ALIASES[norm(String(r))]).filter(Boolean);
