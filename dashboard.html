@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Panel — Web GL CBC</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Barra lateral -->
+        <aside class="sidebar">
+            <h3>Menú</h3>
+            <button id="nav-home" onclick="switchModule('home')">Inicio</button>
+            <button id="nav-cases" onclick="switchModule('cases')">Causas</button>
+            <button id="nav-calendar" onclick="switchModule('calendar')">Calendario</button>
+            <button id="nav-billing" onclick="switchModule('billing')">Honorarios</button>
+            <button id="nav-crm" onclick="switchModule('crm')">CRM</button>
+            <button id="nav-directory" onclick="switchModule('directory')">Directorio</button>
+            <button id="nav-documents" onclick="switchModule('documents')">Documentos</button>
+            <button id="nav-clients" onclick="switchModule('clients')" style="display:none">Clientes</button>
+            <button id="nav-reports" onclick="switchModule('reports')">Reportes</button>
+            <button id="nav-profile" onclick="switchModule('profile')">Perfil</button>
+
+            <!-- Elementos adicionales, visibles según rol -->
+            <button id="nav-authorizations" onclick="switchModule('authorizations')" style="display:none">Autorizaciones</button>
+            <button id="nav-bitacora" onclick="switchModule('bitacora')" style="display:none">Bitácora</button>
+            <button id="nav-notifications" onclick="switchModule('notifications')" style="display:none">Notificaciones</button>
+            <button id="nav-chat" onclick="switchModule('chat')" style="display:none">Chat</button>
+            <button id="nav-officeBooking" onclick="switchModule('officeBooking')" style="display:none">Agendar oficina</button>
+            <button id="nav-meetings" onclick="switchModule('meetings')" style="display:none">Reuniones</button>
+            <button id="nav-financials" onclick="switchModule('financials')" style="display:none">Finanzas</button>
+            <button id="nav-accountRequests" onclick="switchModule('accountRequests')" style="display:none">Solicitudes cuentas</button>
+            <button id="nav-userManagement" onclick="switchModule('userManagement')" style="display:none">Usuarios</button>
+            <button id="nav-settings" onclick="switchModule('settings')" style="display:none">Configuraciones</button>
+
+            <!-- Nueva sección de ingresos personales -->
+            <button id="nav-earnings" onclick="switchModule('earnings')" style="display:none">Mis ingresos</button>
+
+            <!-- Botón de cerrar sesión al final de la barra lateral -->
+            <button id="nav-logout" onclick="logout()" class="logout-btn">Cerrar sesión</button>
+        </aside>
+        <!-- Contenido principal -->
+        <main class="main-content">
+            <!-- Módulo de resumen (vista para abogados) -->
+            <section id="home" class="module">
+                <h2>Resumen operativo</h2>
+                <div class="cards-row">
+                    <div class="card">
+                        <h3>Total causas</h3>
+                        <p id="sumCases">0</p>
+                    </div>
+                    <div class="card">
+                        <h3>Tareas críticas (≤3d / vencidas)</h3>
+                        <p id="sumCriticalTasks">0</p>
+                    </div>
+                    <div class="card">
+                        <h3>Próximas a expirar (≤7d)</h3>
+                        <p id="sumNearExpTasks">0</p>
+                    </div>
+                </div>
+                <h3>Causas sin movimientos (&gt;7 días)</h3>
+                <div id="staleCases"></div>
+                <h3>Causas no revisadas (&gt;2 días)</h3>
+                <div id="notReviewedCases"></div>
+                <h3>Recordatorios</h3>
+                <div id="reminders"></div>
+                <h3>Tareas críticas</h3>
+                <div id="criticalTasks"></div>
+                <h3>Tareas próximas a expirar</h3>
+                <div id="nearExpiryTasks"></div>
+            </section>
+
+            <!-- Módulo de resumen para clientes -->
+            <section id="clientHome" class="module" style="display:none">
+                <h2>Mi Portal</h2>
+                <div class="cards-row">
+                    <div class="card">
+                        <h3>Mis causas</h3>
+                        <p id="cliCasesCount">0</p>
+                    </div>
+                    <div class="card">
+                        <h3>Próximos pasos</h3>
+                        <p id="cliNextSteps">0</p>
+                    </div>
+                    <div class="card">
+                        <h3>Documentos visibles</h3>
+                        <p id="cliDocsCount">0</p>
+                    </div>
+                </div>
+                <h3>Mis causas</h3>
+                <div id="cliCases"></div>
+                <h3>Próximos pasos</h3>
+                <div id="cliNextTasks"></div>
+                <h3>Escritos / Resoluciones</h3>
+                <div id="cliResolutions"></div>
+                <h3>Documentos visibles</h3>
+                <div id="cliDocuments"></div>
+            </section>
+            <!-- Módulo de causas -->
+            <section id="cases" class="module">
+                <h2>Mis causas</h2>
+                <!-- Botón para mostrar formulario de nueva causa -->
+                <!-- Se agrega onclick para asegurar que se ejecute el toggle, además del listener en JS -->
+                <button id="showAddCaseBtn" class="btn btn-primary" style="margin-bottom:1rem;" onclick="toggleAddCaseForm()">Agregar causa</button>
+                <div id="casesList">
+                    <!-- Lista de causas -->
+                </div>
+                <div id="addCaseContainer" style="display:none; margin-top:1rem;">
+                    <h3>Agregar nueva causa</h3>
+                    <form id="addCaseForm">
+                        <div class="form-group">
+                            <label for="caseName">Nombre de la causa</label>
+                            <input type="text" id="caseName" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="caseClient">Cliente</label>
+                            <select id="caseClient" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="caseNumber">Número de expediente</label>
+                            <input type="text" id="caseNumber" />
+                        </div>
+                        <div class="form-group">
+                            <label for="caseCategory">Categoría</label>
+                            <select id="caseCategory">
+                            <option value="civil">Civil</option>
+                            <option value="penal">Penal</option>
+                            <option value="laboral">Laboral</option>
+                            <option value="otro">Otro</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="caseState">Estado</label>
+                        <select id="caseState">
+                            <option value="iniciado">Iniciado</option>
+                            <option value="en_proceso">En proceso</option>
+                            <option value="finalizado">Finalizado</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="caseTags">Etiquetas</label>
+                        <input type="text" id="caseTags" placeholder="Separadas por coma" />
+                    </div>
+                    <div class="form-group">
+                        <label for="caseDescription">Descripción</label>
+                        <textarea id="caseDescription" rows="3" required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Crear causa</button>
+                    </form>
+                </div> <!-- cierre addCaseContainer -->
+            </section>
+            <!-- Detalles de una causa específica -->
+            <section id="caseDetails" class="module">
+                <button class="btn" onclick="backToCases()">&larr; Volver a causas</button>
+                <h2 id="caseTitle">Detalles de la causa</h2>
+                <!-- Información adicional de la causa -->
+                <p id="caseDescriptionText"></p>
+                <div id="caseInfo"></div>
+                <h3>Tareas</h3>
+                <div id="tasksList"></div>
+                <form id="addTaskForm">
+                    <div class="form-group">
+                        <label for="taskName">Nombre de la tarea</label>
+                        <input type="text" id="taskName" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="taskDue">Fecha de vencimiento</label>
+                        <input type="date" id="taskDue" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="taskAssignee">Asignado a</label>
+                        <select id="taskAssignee" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label><input type="checkbox" id="taskVisible" /> Visible para cliente</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Agregar tarea</button>
+                </form>
+                <h3>Documentos</h3>
+                <button id="showAddDocumentBtn" class="btn btn-primary" style="margin-bottom:0.5rem;" onclick="toggleAddDocumentForm()">Agregar documento</button>
+                <div id="documentsList"></div>
+                <div id="addDocumentContainer" style="display:none; margin-top:1rem;">
+                    <form id="addDocumentForm">
+                        <div class="form-group">
+                            <label for="docTitle">Título del documento</label>
+                            <input type="text" id="docTitle" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="docDescription">Descripción</label>
+                            <input type="text" id="docDescription" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="docFile">Archivo</label>
+                            <input type="file" id="docFile" />
+                        </div>
+                        <div class="form-group">
+                            <label><input type="checkbox" id="docVisible" /> Visible para cliente</label>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Guardar documento</button>
+                    </form>
+                </div>
+
+                <!-- Sección de actuaciones -->
+                <h3>Actuaciones</h3>
+                <!-- Botón para mostrar formulario de nueva actuación -->
+                <button id="showAddActBtn" class="btn btn-primary" style="margin-bottom:0.5rem;">Agregar actuación</button>
+                <div id="actsList"></div>
+                <div id="addActContainer" style="display:none; margin-top:1rem;">
+                    <form id="addActForm">
+                        <div class="form-group">
+                            <label for="actTitle">Título</label>
+                            <input type="text" id="actTitle" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="actDate">Fecha</label>
+                            <input type="date" id="actDate" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="actDesc">Descripción</label>
+                            <textarea id="actDesc" rows="2"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="actFile">Archivo</label>
+                            <input type="file" id="actFile" />
+                        </div>
+                        <div class="form-group">
+                            <label><input type="checkbox" id="actVisible" /> Visible para cliente</label>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Guardar actuación</button>
+                    </form>
+                </div>
+
+                <!-- Sección de vinculaciones -->
+                <h3>Vinculaciones</h3>
+                <button id="showAddLinkBtn" class="btn btn-primary" style="margin-bottom:0.5rem;">Agregar vinculación</button>
+                <div id="linkedContactsList"></div>
+                <div id="addLinkContainer" style="display:none; margin-top:1rem;">
+                    <form id="addLinkForm">
+                        <div class="form-group">
+                            <label for="linkContact">Contacto</label>
+                            <select id="linkContact"></select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Agregar contacto</button>
+                    </form>
+                </div>
+
+                <!-- Sección de alertas -->
+                <h3>Alertas</h3>
+                <button id="showAddAlertBtn" class="btn btn-primary" style="margin-bottom:0.5rem;">Agregar alerta</button>
+                <div id="alertsList"></div>
+                <div id="addAlertContainer" style="display:none; margin-top:1rem;">
+                    <form id="addAlertForm">
+                        <div class="form-group">
+                            <label for="alertTitle">Título</label>
+                            <input type="text" id="alertTitle" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="alertDate">Fecha y hora</label>
+                            <input type="datetime-local" id="alertDate" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="alertDesc">Descripción</label>
+                            <textarea id="alertDesc" rows="2"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label><input type="checkbox" id="alertVisible" /> Visible para cliente</label>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Guardar alerta</button>
+                    </form>
+                </div>
+
+                <!-- Sección de resoluciones judiciales -->
+                <h3>Resoluciones judiciales</h3>
+                <form id="addResolutionForm">
+                    <div class="form-group">
+                        <label for="resTitle">Título</label>
+                        <input type="text" id="resTitle" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="resDate">Fecha</label>
+                        <input type="date" id="resDate" />
+                    </div>
+                    <div class="form-group">
+                        <label for="resFile">Archivo</label>
+                        <input type="file" id="resFile" />
+                    </div>
+                    <div class="form-group">
+                        <label for="resDesc">Descripción</label>
+                        <textarea id="resDesc" rows="2"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label><input type="checkbox" id="resVisible" /> Visible para cliente</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Agregar resolución</button>
+                </form>
+                <table class="table">
+                    <thead>
+                        <tr><th>Título</th><th>Fecha</th><th>Visible cliente</th><th>Archivo</th></tr>
+                    </thead>
+                    <tbody id="resolutionsBody"></tbody>
+                </table>
+                <button class="btn secondary" onclick="markReviewedFromCase()">Marcar revisada (¿hubo novedad?)</button>
+
+                <!-- Sección de honorarios -->
+                <h3>Honorarios</h3>
+                <div id="honorariosList"></div>
+                <form id="addHonorarioForm">
+                    <div class="form-group">
+                        <label for="honDetail">Detalle</label>
+                        <input type="text" id="honDetail" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="honDate">Fecha</label>
+                        <input type="date" id="honDate" />
+                    </div>
+                    <div class="form-group">
+                        <label for="honAmount">Monto</label>
+                        <input type="number" id="honAmount" step="0.01" min="0" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="honCurrency">Moneda</label>
+                        <select id="honCurrency">
+                            <option value="CLP">CLP</option>
+                            <option value="UF">UF</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><input type="checkbox" id="honIncludeIVA" /> Incluir IVA (19%)</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Agregar honorario</button>
+                </form>
+
+                <h3>Horas y gastos</h3>
+                <div id="timeEntriesList"></div>
+                <div id="expensesList"></div>
+                <form id="addTimeEntryForm">
+                    <div class="form-group">
+                        <label for="timeHours">Horas</label>
+                        <input type="number" id="timeHours" step="0.1" min="0" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="timeDesc">Descripción</label>
+                        <input type="text" id="timeDesc" required />
+                    </div>
+                    <button type="submit" class="btn btn-primary">Agregar tiempo</button>
+                </form>
+                <form id="addExpenseForm">
+                    <div class="form-group">
+                        <label for="expenseAmount">Monto</label>
+                        <input type="number" id="expenseAmount" step="0.1" min="0" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="expenseCurrency">Moneda</label>
+                        <select id="expenseCurrency">
+                            <option value="CLP">CLP</option>
+                            <option value="UF">UF</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="expenseDesc">Descripción</label>
+                        <input type="text" id="expenseDesc" required />
+                    </div>
+                    <button type="submit" class="btn btn-primary">Agregar gasto</button>
+                </form>
+
+                <!-- Participantes de la causa -->
+                <h3>Participantes y distribución de honorarios</h3>
+                <div id="participantsList"></div>
+                <form id="addParticipantForm" style="margin-top:1rem;">
+                    <div class="form-group">
+                        <label for="participantUser">Usuario</label>
+                        <select id="participantUser"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="participantShareType">Tipo de participación</label>
+                        <select id="participantShareType">
+                            <option value="percentage">Porcentaje</option>
+                            <option value="fixed">Monto fijo</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="participantShareValue">Valor</label>
+                        <input type="number" id="participantShareValue" step="0.1" min="0" required />
+                    </div>
+                    <div class="form-group" id="participantCurrencyGroup" style="display:none;">
+                        <label for="participantCurrency">Moneda</label>
+                        <select id="participantCurrency">
+                            <option value="CLP">CLP</option>
+                            <option value="UF">UF</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Agregar participante</button>
+                </form>
+
+                <!-- Gestiones pagadas -->
+                <h3>Gestiones pagadas</h3>
+                <div id="gestionesList"></div>
+                <form id="addGestionForm" style="margin-top:1rem;">
+                    <div class="form-group">
+                        <label for="gestionUser">Asignado a</label>
+                        <select id="gestionUser"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="gestionDesc">Descripción</label>
+                        <input type="text" id="gestionDesc" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="gestionAmount">Monto</label>
+                        <input type="number" id="gestionAmount" step="0.1" min="0" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="gestionCurrency">Moneda</label>
+                        <select id="gestionCurrency">
+                            <option value="CLP">CLP</option>
+                            <option value="UF">UF</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Agregar gestión</button>
+                </form>
+
+                <!-- Chat de la causa -->
+                <h3>Chat de la causa</h3>
+                <div id="caseChatMessages" style="border:1px solid var(--color-secondary); padding:0.5rem; max-height:300px; overflow-y:auto;"></div>
+                <form id="caseChatForm" style="margin-top:0.5rem;">
+                    <input type="text" id="caseChatInput" placeholder="Escribe un mensaje..." style="width:80%; padding:0.5rem;" />
+                    <button type="submit" class="btn btn-primary" style="width:18%; margin-left:2%;">Enviar</button>
+                </form>
+            </section>
+            <!-- Calendario / tareas próximas -->
+            <section id="calendar" class="module">
+                <h2>Calendario</h2>
+                <!-- Botón para agregar un nuevo evento o recordatorio -->
+                <button id="addEventBtn" class="btn btn-primary" style="margin-bottom:1rem;" onclick="toggleAddEventForm()">Agregar evento</button>
+                <!-- Formulario de evento oculto -->
+                <div id="addEventContainer" style="display:none; margin-bottom:1rem;">
+                    <h3>Nuevo evento</h3>
+                    <form id="addEventForm">
+                        <div class="form-group">
+                            <label for="eventTitle">Título</label>
+                            <input type="text" id="eventTitle" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="eventStart">Inicio</label>
+                            <input type="datetime-local" id="eventStart" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="eventEnd">Fin</label>
+                            <input type="datetime-local" id="eventEnd" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="eventCase">Causa (opcional)</label>
+                            <select id="eventCase">
+                                <option value="">Sin causa</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="eventVisibility">Visibilidad</label>
+                            <select id="eventVisibility">
+                                <option value="public">Todos los socios</option>
+                                <option value="private">Privado</option>
+                                <option value="custom">Personalizado</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="eventParticipantsContainer" style="display:none;">
+                            <label for="eventParticipants">Selecciona participantes</label>
+                            <select id="eventParticipants" multiple></select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Guardar evento</button>
+                    </form>
+                </div>
+                <!-- Vista mensual del calendario -->
+                <div id="calendarMonth" class="calendar-month"></div>
+                <!-- Lista de tareas para esta semana -->
+                <h3>Tareas de la semana</h3>
+                <div id="calendarWeekTasks"></div>
+                <!-- Lista de tareas próximas -->
+                <h3>Próximas tareas</h3>
+                <div id="calendarUpcomingTasks"></div>
+            </section>
+            <!-- Facturación y honorarios -->
+            <section id="billing" class="module">
+                <h2 id="billingHeading">Honorarios y Facturación</h2>
+                <div id="billingSummary"></div>
+            </section>
+            <!-- CRM -->
+            <section id="crm" class="module">
+                <h2>Clientes</h2>
+                <div id="clientsList"></div>
+            </section>
+            <!-- Perfil -->
+            <section id="profile" class="module">
+                <h2>Mi perfil</h2>
+                <div id="profileInfo"></div>
+                <h3>Actualizar datos</h3>
+                <form id="editProfileForm">
+                    <div class="form-group">
+                        <label for="profileEmail">Correo</label>
+                        <input type="email" id="profileEmail" />
+                    </div>
+                    <div class="form-group">
+                        <label for="profilePhone">Teléfono</label>
+                        <input type="text" id="profilePhone" />
+                    </div>
+                    <div class="form-group">
+                        <label for="profileAddress">Dirección</label>
+                        <input type="text" id="profileAddress" />
+                    </div>
+                    <div class="form-group">
+                        <label for="profilePhoto">Foto</label>
+                        <input type="file" id="profilePhoto" accept="image/*" />
+                    </div>
+                    <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                </form>
+                <h3>Actualizar contraseña</h3>
+                <form id="changePasswordForm">
+                    <div class="form-group">
+                        <label for="currentPassword">Contraseña actual</label>
+                        <input type="password" id="currentPassword" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="newPassword">Nueva contraseña</label>
+                        <input type="password" id="newPassword" required />
+                    </div>
+                    <button type="submit" class="btn btn-primary">Actualizar</button>
+                </form>
+            </section>
+
+            <!-- Directorio -->
+            <section id="directory" class="module">
+                <h2>Directorio</h2>
+                <!-- Botón para mostrar el formulario de nuevo contacto -->
+                <button id="showAddDirectoryBtn" class="btn btn-primary" style="margin-bottom:1rem;" onclick="toggleAddDirectoryForm()">Agregar contacto</button>
+                <!-- Lista de contactos existentes -->
+                <div id="directoryList"></div>
+                <!-- Detalles del contacto seleccionado -->
+                <div id="directoryDetail" style="display:none;"></div>
+                <!-- Contenedor del formulario para agregar/modificar contacto -->
+                <div id="addDirectoryContainer" style="display:none; margin-top:1rem;">
+                    <h3 id="directoryFormTitle">Nuevo contacto</h3>
+                    <form id="addDirectoryForm">
+                        <input type="hidden" id="dirId" />
+                        <div class="form-group">
+                            <label for="dirType">Tipo</label>
+                            <select id="dirType">
+                                <option value="person">Persona</option>
+                                <option value="organization">Organización</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="dirName">Nombre</label>
+                            <input type="text" id="dirName" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="dirSurname">Apellido</label>
+                            <input type="text" id="dirSurname" />
+                        </div>
+                        <div class="form-group">
+                            <label for="dirState">Estado</label>
+                            <input type="text" id="dirState" />
+                        </div>
+                        <div class="form-group">
+                            <label for="dirAddress">Dirección</label>
+                            <input type="text" id="dirAddress" />
+                        </div>
+                        <div class="form-group">
+                            <label for="dirPhone">Teléfono</label>
+                            <input type="text" id="dirPhone" />
+                        </div>
+                        <div class="form-group">
+                            <label for="dirRoute">Ruta</label>
+                            <input type="text" id="dirRoute" />
+                        </div>
+                        <div class="form-group">
+                            <label for="dirTags">Etiquetas</label>
+                            <input type="text" id="dirTags" placeholder="Separadas por coma" />
+                        </div>
+                        <button type="submit" class="btn btn-primary">Guardar contacto</button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Clientes -->
+            <section id="clients" class="module">
+                <h2>Clientes</h2>
+                <!-- Botón para mostrar formulario de nuevo cliente -->
+                <button id="showAddClientBtn" class="btn btn-primary" style="margin-bottom:1rem;" onclick="toggleAddClientForm()">Agregar cliente</button>
+                <!-- Lista de clientes -->
+                <div id="clientList"></div>
+                <!-- Formulario de nuevo cliente oculto -->
+                <div id="addClientContainer" style="display:none; margin-top:1rem;">
+                    <h3 id="clientFormTitle">Nuevo cliente</h3>
+                    <form id="addClientForm">
+                        <div class="form-group">
+                            <label for="clientName">Nombre</label>
+                            <input type="text" id="clientName" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="clientEmail">Email</label>
+                            <input type="email" id="clientEmail" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="clientPhone">Teléfono</label>
+                            <input type="text" id="clientPhone" />
+                        </div>
+                        <div class="form-group">
+                            <label for="clientAddress">Dirección</label>
+                            <input type="text" id="clientAddress" />
+                        </div>
+                        <button type="submit" class="btn btn-primary">Guardar cliente</button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Documentos -->
+            <section id="documents" class="module">
+                <h2>Documentos</h2>
+                <div id="globalDocumentsList"></div>
+                <!-- Botón para mostrar el formulario de carga -->
+                <button id="showAddGlobalDocBtn" class="btn btn-primary" style="margin-top:1rem;" onclick="toggleAddGlobalDocForm()">Subir documento</button>
+                <!-- Contenedor del formulario de documento -->
+                <div id="addGlobalDocContainer" style="display:none; margin-top:1rem;">
+                    <h3>Nuevo documento</h3>
+                    <form id="addGlobalDocumentForm">
+                        <div class="form-group">
+                            <label for="globalDocTitle">Título</label>
+                            <input type="text" id="globalDocTitle" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="globalDocDescription">Descripción</label>
+                            <input type="text" id="globalDocDescription" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="globalDocCase">Expediente</label>
+                            <select id="globalDocCase"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="globalDocContact">Asociar a persona</label>
+                            <select id="globalDocContact"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="globalDocFile">Archivo</label>
+                            <input type="file" id="globalDocFile" />
+                        </div>
+                        <button type="submit" class="btn btn-primary">Subir documento</button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Reportes -->
+            <section id="reports" class="module">
+                <h2>Estadísticas y Reportes</h2>
+                <div id="reportContent"></div>
+            </section>
+
+            <!-- Autorizaciones -->
+            <section id="authorizations" class="module">
+                <h2>Autorizaciones pendientes</h2>
+                <div id="authList"></div>
+            </section>
+
+            <!-- Bitácora -->
+            <section id="bitacora" class="module">
+                <h2>Bitácora de casos</h2>
+                <div id="bitacoraCases"></div>
+                <div id="bitacoraEntries"></div>
+            </section>
+
+            <!-- Agendamiento de oficinas -->
+            <section id="officeBooking" class="module">
+                <h2>Agendamiento de oficinas</h2>
+                <div id="officeList"></div>
+                <div id="officeSchedule" style="margin-top:1rem;"></div>
+                <!-- Botón para mostrar el formulario de reserva -->
+                <button id="showBookingFormBtn" class="btn btn-primary" style="margin-top:1rem;">Agregar reserva</button>
+                <!-- Formulario de reserva oculto por defecto -->
+                <div id="bookingFormContainer" style="display:none; margin-top:1rem;">
+                    <h3>Reservar oficina</h3>
+                    <form id="bookOfficeForm">
+                        <div class="form-group">
+                            <label for="bookingOffice">Oficina</label>
+                            <select id="bookingOffice"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="bookingDate">Fecha</label>
+                            <input type="date" id="bookingDate" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="bookingStart">Hora inicio</label>
+                            <input type="time" id="bookingStart" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="bookingEnd">Hora fin</label>
+                            <input type="time" id="bookingEnd" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="bookingReason">Motivo</label>
+                            <input type="text" id="bookingReason" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="bookingVisibility">Visibilidad</label>
+                            <select id="bookingVisibility">
+                                <option value="public">Todos los socios</option>
+                                <option value="private">Privado</option>
+                                <option value="custom">Personalizado</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="bookingParticipantsContainer" style="display:none;">
+                            <label for="bookingParticipants">Selecciona participantes</label>
+                            <select id="bookingParticipants" multiple></select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Reservar</button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Reuniones -->
+            <section id="meetings" class="module">
+                <h2>Reuniones</h2>
+                <div id="meetingsList"></div>
+                <div id="meetingRequestsList"></div>
+                <hr />
+                <h3 id="meetingFormTitle">Programar reunión</h3>
+                <form id="meetingForm">
+                    <div class="form-group">
+                        <label for="meetingType">Tipo de reunión</label>
+                        <select id="meetingType">
+                            <!-- Se cambió la primera opción para indicar claramente que no está asociada a ninguna causa -->
+                            <option value="general">Sin causa (abierta)</option>
+                            <option value="grupo">Grupo interno</option>
+                            <option value="case">Asociada a causa</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="meetingCaseGroup" style="display:none;">
+                        <label for="meetingCase">Causa</label>
+                        <select id="meetingCase"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="meetingTitle">Título</label>
+                        <input type="text" id="meetingTitle" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="meetingDescription">Descripción</label>
+                        <textarea id="meetingDescription" rows="2"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="meetingDate">Fecha</label>
+                        <input type="date" id="meetingDate" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="meetingTime">Hora</label>
+                        <input type="time" id="meetingTime" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="meetingParticipants">Invitados</label>
+                        <select id="meetingParticipants" multiple></select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Guardar reunión</button>
+                </form>
+            </section>
+
+            <!-- Finanzas -->
+            <section id="financials" class="module">
+                <h2>Finanzas</h2>
+                <div id="financeSummary"></div>
+                <h3>Ingresos y gastos de la sociedad</h3>
+                <div id="financialRecordsTable"></div>
+                <hr />
+                <h3>Registrar ingreso</h3>
+                <form id="incomeForm">
+                    <div class="form-group">
+                        <label for="incomeAmount">Monto</label>
+                        <input type="number" id="incomeAmount" step="0.01" min="0" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="incomeDesc">Descripción</label>
+                        <input type="text" id="incomeDesc" required />
+                    </div>
+                    <button type="submit" class="btn btn-primary">Agregar ingreso</button>
+                </form>
+                <h3>Registrar gasto</h3>
+                <form id="societyExpenseForm">
+                    <div class="form-group">
+                        <label for="societyExpenseAmount">Monto</label>
+                        <input type="number" id="societyExpenseAmount" step="0.01" min="0" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="societyExpenseDesc">Descripción</label>
+                        <input type="text" id="societyExpenseDesc" required />
+                    </div>
+                    <button type="submit" class="btn btn-primary">Agregar gasto</button>
+                </form>
+            </section>
+
+            <!-- Solicitudes de cuentas (Admin) -->
+            <section id="accountRequests" class="module">
+                <h2>Solicitudes de creación de cuentas</h2>
+                <div id="accountRequestsList"></div>
+            </section>
+
+            <!-- Gestión de usuarios (Admin) -->
+            <section id="userManagement" class="module">
+                <h2>Gestión de usuarios</h2>
+                <div id="userList"></div>
+            </section>
+
+            <!-- Configuraciones (Admin) -->
+            <section id="settings" class="module">
+                <h2>Configuraciones</h2>
+                <div id="settingsContent"></div>
+            </section>
+
+            <!-- Mis ingresos (para roles no clientes) -->
+            <section id="earnings" class="module">
+                <h2>Mis ingresos</h2>
+                <div id="earningsContent"></div>
+            </section>
+
+            <!-- Notificaciones -->
+            <section id="notifications" class="module">
+                <h2>Notificaciones</h2>
+                <div id="notificationsList"></div>
+            </section>
+
+            <!-- Chat entre socios -->
+            <section id="chat" class="module">
+                <h2>Chat</h2>
+                <div class="chat-container">
+                    <div class="chat-users" id="chatUsers">
+                        <!-- Lista de socios para chatear -->
+                    </div>
+                    <div class="chat-conversation">
+                        <div id="chatMessages"></div>
+                        <form id="partnerChatForm" style="margin-top:1rem;">
+                            <input type="text" id="partnerChatInput" placeholder="Escribe un mensaje..." style="width:80%; padding:0.5rem;" />
+                            <button type="submit" class="btn btn-primary" style="width:18%; margin-left:2%;">Enviar</button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="app.js"></script>
+    <script>
+        // Requiere que el usuario esté autenticado
+        requireAuth();
+        // Inicializa el panel
+        initDashboard();
+    </script>
+</body>
+</html>

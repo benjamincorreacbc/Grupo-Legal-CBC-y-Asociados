@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Grupo Legal Cortés Forquejil Correa</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <!-- Encabezado principal con menú de navegación -->
+    <header class="header">
+        <div class="container">
+            <span class="logo" id="landingLogo">Grupo Legal Cortéz, Bórquez & Correa</span>
+            <nav class="nav">
+                <a href="#about" id="navAbout">Quiénes somos</a>
+                <a href="#services" id="navServices">Servicios</a>
+                <a href="#contact" id="navContact">Contacto</a>
+                <a href="login.html" class="btn btn-primary">Intranet</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Sección hero -->
+    <section class="hero">
+        <div class="container">
+            <h2 id="heroTitle">Grupo Legal Cortéz, Bórquez & Correa</h2>
+            <p id="heroSubtitle">Su aliado en todas las áreas del derecho</p>
+        </div>
+    </section>
+
+    <!-- Sección Quiénes Somos -->
+    <section class="about" id="about">
+        <div class="container">
+            <h2 id="aboutTitle">Quiénes somos</h2>
+            <p id="aboutText">Somos un estudio jurídico comprometido con entregar soluciones
+                personalizadas y de alta calidad en distintas áreas del derecho. Nuestro equipo se
+                compone de profesionales con amplia experiencia en litigios, asesoría y consultoría
+                legal.</p>
+        </div>
+    </section>
+
+    <!-- Sección Servicios -->
+    <section class="services" id="services">
+        <div class="container">
+            <h2 id="servicesTitle">Nuestros servicios</h2>
+            <div id="servicesList" class="services-grid">
+                <!-- Servicios se insertan dinámicamente -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Sección Contacto -->
+    <section class="contact" id="contact">
+        <div class="container">
+            <h2 id="contactTitle">Contacto</h2>
+            <p id="contactText">Dirección: Thompson 889, Quilpué, Valparaíso<br />
+                Teléfono: +56 9 1234 5678<br />
+                Email: contacto@grupolegalcfc.cl</p>
+        </div>
+    </section>
+
+    <!-- Pie de página -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2025 Grupo Legal Cortés Forquejil Correa. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="app.js"></script>
+    <script>
+        // Renderizar el contenido de la página de inicio desde localStorage
+        if (typeof renderLanding === 'function') {
+            renderLanding();
+        }
+    </script>
+</body>
+</html>

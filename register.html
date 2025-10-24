@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Registro — Web GL CBC</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <div class="auth-wrapper">
+        <div class="auth-card">
+            <h2>Solicitar apertura de cuenta</h2>
+            <form id="registerForm">
+                <label for="regName">Nombre completo</label>
+                <input type="text" id="regName" required />
+                <label for="regEmail">Correo electrónico</label>
+                <input type="email" id="regEmail" required />
+                <label for="regPassword">Contraseña</label>
+                <input type="password" id="regPassword" required />
+                <label for="regConfirm">Confirmar contraseña</label>
+                <input type="password" id="regConfirm" required />
+                <label for="regRole">Tipo de perfil solicitado</label>
+                <select id="regRole" required>
+                    <option value="">Selecciona un tipo</option>
+                    <option value="socio_fundador">Socio fundador</option>
+                    <option value="socio_mayorista">Socio mayorista</option>
+                    <option value="socio">Socio</option>
+                    <option value="asociado">Asociado</option>
+                    <option value="abogado_asociado">Abogado asociado</option>
+                    <option value="cliente">Cliente</option>
+                </select>
+                <button type="submit" class="btn btn-primary">Solicitar</button>
+            </form>
+            <p style="margin-top: 1rem; text-align: center; font-size: 0.9rem;">
+                ¿Ya tienes cuenta? <a href="login.html">Inicia sesión</a>
+            </p>
+        </div>
+    </div>
+    <script src="app.js"></script>
+    <script>
+        document.getElementById('registerForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            requestAccount();
+        });
+    </script>
+</body>
+</html>
