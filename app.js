@@ -1,6 +1,3 @@
-// app.js — GL CBC (CDN global, sin módulos).
-// Seguridad: esta es una anon key pública por diseño. Activa RLS y políticas en tus tablas.
-// Recomendación: rota la anon luego de terminar las pruebas (Settings → API → Rotate).
 
 const SUPABASE_URL  = 'https://focxelshnrrvanlnusqf.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZvY3hlbHNobnJydmFubG51c3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEzMTAyNDAsImV4cCI6MjA3Njg4NjI0MH0.VNFpA5hESELQpjKbhZPMPOIGJiX0mV5bJVg5FbtqH1s';
@@ -12,6 +9,7 @@ if (!window.supabase) {
 
 const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON) : null;
 
+// Mostrar estado en pantalla
 function showStatus(msg) {
   const s = document.getElementById('status');
   if (s) { s.style.display = 'block'; s.textContent = msg; }
@@ -37,7 +35,7 @@ window.loginUser = async function () {
   }
 };
 
-// Registro básico (si usas register.html)
+// (Opcional) Si usas registro:
 window.requestAccount = async function () {
   try {
     const name  = document.getElementById('regName')?.value?.trim();
@@ -62,7 +60,7 @@ window.requestAccount = async function () {
   }
 };
 
-// Exigir sesión en dashboard
+// Proteger dashboard
 window.requireAuth = async function () {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { window.location.href = 'login.html'; }
@@ -74,7 +72,7 @@ window.logout = async function () {
   window.location.href = 'login.html';
 };
 
-// Inicializa dashboard
+// Inicializar dashboard (opcional)
 window.initDashboard = async function () {
   const { data: { session } } = await sb.auth.getSession();
   const emailSpan = document.getElementById('user-email');
@@ -82,7 +80,7 @@ window.initDashboard = async function () {
   window.switchModule?.('home');
 };
 
-// Navegación simple (si usas secciones con class="module")
+// Navegación simple entre módulos (si usas secciones con class="module")
 window.switchModule = function (id) {
   document.querySelectorAll('.module').forEach(el => el.style.display = 'none');
   const target = document.getElementById(id);
