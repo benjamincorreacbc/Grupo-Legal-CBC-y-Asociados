@@ -104,24 +104,22 @@ const ROLE_ALIASES = {
   'cliente': 'cliente',
 };
 
-// 2) Permisos por rol
-//   - "nav" son los IDs lógicos de tu sidebar: deben existir botones #nav-<id>
-//   - y módulos <section id="<id>" class="module"> en dashboard.html.
-//   - Si algún id de abajo no existe en tu HTML, el código lo ignora sin romper.
+// 2) Permisos por rol (IDs deben existir en tu HTML: #nav-<id> y <section id="<id>" class="module">)
 const PERMISSIONS = {
   socio_fundador:  { start: 'home', nav: ['home','cases','calendar','billing','crm','directory','documents','clients','reports','profile','financials','accountRequests','userManagement','settings','earnings','notifications','chat','authorizations','bitacora','officeBooking','meetings'] },
   socio_mayorista: { start: 'home', nav: ['home','cases','calendar','billing','crm','directory','documents','clients','reports','profile','financials','earnings','notifications','chat','officeBooking','meetings'] },
   socio:           { start: 'home', nav: ['home','cases','calendar','crm','directory','documents','reports','profile','earnings','chat','meetings'] },
   asociado:        { start: 'home', nav: ['home','cases','calendar','crm','documents','profile','earnings','meetings'] },
   abogado_asociado:{ start: 'home', nav: ['home','cases','calendar','crm','documents','profile','earnings','meetings'] },
-  cliente:         { start: 'home', nav: ['home','cases','documents','profile','meetings'] }, // acceso básico
+  cliente:         { start: 'home', nav: ['home','cases','documents','profile','meetings'] },
 };
 
 // 3) Utilidades
-const norm = (s) => (s ? (s.normalize?.('NFD').replace(/\p{Diacritic}+/gu, '') || s).toLowerCase().trim() : '');
+const norm = (s) => s ? (s.normalize?.('NFD').replace(/[\u0300-\u036f]/g, '') || s).toLowerCase().trim() : '';
 
 async function getUserRoleSlug() {
-  const { data: { user } } = await sb.auth.getUser();
+  const res = await sb.auth.getUser();
+  const user = res?.data?.user;
   const raw = user?.user_metadata?.role ?? user?.user_metadata?.roles; // admite "role" o "roles[]"
   const priority = ['socio_fundador','socio_mayorista','socio','asociado','abogado_asociado','cliente'];
 
@@ -134,7 +132,8 @@ async function getUserRoleSlug() {
 
 function setActiveNav(id) {
   document.querySelectorAll('.sidebar button[id^="nav-"]').forEach(b => b.classList.remove('active'));
-  document.getElementById(`nav-${id}`)?.classList.add('active');
+  const btn = document.getElementById(`nav-${id}`);
+  if (btn) btn.classList.add('active');
 }
 
 // Muestra un único módulo y marca el botón correspondiente
@@ -150,16 +149,16 @@ async function applyRolePermissions() {
   const slug = await getUserRoleSlug();
   const cfg = PERMISSIONS[slug] ?? PERMISSIONS.socio;
 
-  // Oculta todo por defecto
+  // Oculta todo
   document.querySelectorAll('.sidebar button[id^="nav-"]').forEach(btn => (btn.style.display = 'none'));
   document.querySelectorAll('.module').forEach(el => (el.style.display = 'none'));
 
-  // Solo IDs que realmente existan en tu HTML
+  // Filtra a los que existan realmente en el HTML
   const existing = (cfg.nav || []).filter(id =>
     document.getElementById(`nav-${id}`) || document.getElementById(id)
   );
 
-  // Muestra los permitidos
+  // Muestra permitidos
   existing.forEach(id => {
     const btn = document.getElementById(`nav-${id}`);
     if (btn) btn.style.display = '';
@@ -171,34 +170,34 @@ async function applyRolePermissions() {
     btn.onclick = () => switchModule(id);
   });
 
-  // Abre módulo inicial (si no existe, cae en el primero disponible o 'home')
+  // Abre módulo inicial
   const start = existing.includes(cfg.start) ? cfg.start : (existing[0] ?? 'home');
   switchModule(start);
 }
 
 // 5) Arranque del dashboard (guard + permisos + listeners)
 window.initDashboard = async function () {
-  // Guard de sesión
-  const { data: { session } } = await sb.auth.getSession();
+  const res = await sb.auth.getSession();
+  const session = res?.data?.session;
   if (!session) { window.location.href = 'login.html'; return; }
 
-  // Pinta correo si tienes un span#user-email
+  // pinta correo si existe <span id="user-email">
   const emailSpan = document.getElementById('user-email');
   if (emailSpan && session?.user?.email) emailSpan.textContent = session.user.email;
 
-  // Aplica permisos de rol y abre el módulo inicial
   await applyRolePermissions();
 
-  // Botón/acción de logout si existe
+  // logout si existe #nav-logout
   document.getElementById('nav-logout')?.addEventListener('click', async () => {
     await sb.auth.signOut();
     window.location.href = 'login.html';
   });
 };
 
-// 6) Auto-inicio si estamos en el dashboard (por si tu HTML no llama initDashboard)
+// 6) Auto-inicio si estamos en el dashboard (busca .dashboard en tu HTML)
 if (document.querySelector('.dashboard')) {
-  sb.auth.getSession().then(({ data: { session } }) => {
+  sb.auth.getSession().then(function(res) {
+    var session = res && res.data && res.data.session;
     if (!session) window.location.href = 'login.html';
     else initDashboard();
   });
