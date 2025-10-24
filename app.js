@@ -96,6 +96,7 @@ console.log('Supabase listo en:', SUPABASE_URL);
 
 // 1) Alias → slug interno
 const ROLE_ALIASES = {
+  'admin': 'admin',
   'socio fundador': 'socio_fundador',
   'socio mayorista': 'socio_mayorista',
   'socio': 'socio',
@@ -106,6 +107,7 @@ const ROLE_ALIASES = {
 
 // 2) Permisos por rol (IDs deben existir en tu HTML: #nav-<id> y <section id="<id>" class="module">)
 const PERMISSIONS = {
+  admin: { start: 'home', nav: ['home','cases','calendar','billing','crm','directory','documents','clients','reports','profile','financials','accountRequests','userManagement','settings','earnings','notifications','chat','authorizations','bitacora','officeBooking','meetings'] },
   socio_fundador:  { start: 'home', nav: ['home','cases','calendar','billing','crm','directory','documents','clients','reports','profile','financials','accountRequests','userManagement','settings','earnings','notifications','chat','authorizations','bitacora','officeBooking','meetings'] },
   socio_mayorista: { start: 'home', nav: ['home','cases','calendar','billing','crm','directory','documents','clients','reports','profile','financials','earnings','notifications','chat','officeBooking','meetings'] },
   socio:           { start: 'home', nav: ['home','cases','calendar','crm','directory','documents','reports','profile','earnings','chat','meetings'] },
