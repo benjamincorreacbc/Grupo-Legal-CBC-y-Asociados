@@ -25,8 +25,11 @@ window.loginUser = async function () {
 
     showStatus('Ingresando…');
     const { error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) { showStatus('Error: ' + error.message); return; }
-
+    if (error) { 
+  showStatus('Error: ' + error.message); 
+  alert('Error: ' + error.message); 
+  return; 
+    }
     // OK → al panel
     window.location.href = 'dashboard.html';
   } catch (e) {
