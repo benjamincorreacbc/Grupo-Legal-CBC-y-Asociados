@@ -19,6 +19,8 @@
                 <input type="password" id="regPassword" required />
                 <label for="regConfirm">Confirmar contraseña</label>
                 <input type="password" id="regConfirm" required />
+                <label for="regPhone">Teléfono de contacto</label>
+                <input type="tel" id="regPhone" placeholder="Ej: +56 9 1234 5678" />
                 <label for="regRole">Tipo de perfil solicitado</label>
                 <select id="regRole" required>
                     <option value="">Selecciona un tipo</option>
@@ -29,6 +31,8 @@
                     <option value="abogado_asociado">Abogado asociado</option>
                     <option value="cliente">Cliente</option>
                 </select>
+                <label for="regComment">Comentario</label>
+                <textarea id="regComment" rows="3" placeholder="Cuéntanos brevemente tu objetivo"></textarea>
                 <button type="submit" class="btn btn-primary">Solicitar</button>
             </form>
             <p style="margin-top: 1rem; text-align: center; font-size: 0.9rem;">
@@ -37,6 +41,7 @@
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
     <script src="app.js"></script>
     <script>
         document.getElementById('registerForm').addEventListener('submit', function (e) {
