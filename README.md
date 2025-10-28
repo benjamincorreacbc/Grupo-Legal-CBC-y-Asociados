@@ -74,24 +74,6 @@ Esta guía explica **paso a paso** cómo usar el proyecto desde cero, sin depend
 
 Con esto el portal se conectará directamente a Supabase desde cualquier dispositivo.
 
-### Ejemplo real con Cloudflare Pages
-
-Si ya cuentas con un proyecto activo en Cloudflare Pages como `grupo-legal-cbc-y-asociados.pages.dev` (dominio principal y
-subdominios automáticos), sigue estos pasos específicos:
-
-1. Copia `config.example.js` como `config.js` y reemplaza:
-   - `window.__GLCBC_SUPABASE_URL__` → `https://focxelshnrrvanlnusqf.supabase.co`.
-   - `window.__GLCBC_SUPABASE_ANON_KEY__` → tu **anon public key** (`eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`).
-   - `window.__GLCBC_API_BASE__` → `https://focxelshnrrvanlnusqf.functions.supabase.co/portal`.
-2. Sube todos los archivos a Cloudflare Pages desde el navegador (botón **Upload assets**) o deja habilitado el despliegue
-   automático conectado a GitHub.
-3. En Supabase añade todas las URLs que entrega Cloudflare en `Authentication → URL Configuration`, por ejemplo:
-   - `https://grupo-legal-cbc-y-asociados.pages.dev`
-   - `https://*.grupo-legal-cbc-y-asociados.pages.dev/*`
-
-> Importante: **no** coloques la `service_role key` en `config.js` ni en ningún archivo público. Esa clave debe mantenerse como
-> secreto de Supabase o GitHub Actions. Para el navegador solo utiliza la `anon public key`.
-
 ---
 
 ## 4. Automatizar desde GitHub (opcional, sin usar consola)

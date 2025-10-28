@@ -15,8 +15,19 @@ const SUPABASE_URL = window.__GLCBC_SUPABASE_URL__;
 const SUPABASE_ANON_KEY = window.__GLCBC_SUPABASE_ANON_KEY__;
 const API_BASE = window.__GLCBC_API_BASE__ || '';
 const ORG_SLUG = window.__GLCBC_ORG_SLUG__ || 'glcbc';
-const USE_REMOTE_API = Boolean(API_BASE);
-let Supabase;
+
+if (!window.supabase) {
+  throw new Error('Supabase JS no está disponible. Asegúrate de cargar el script antes de app.js.');
+}
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.warn('Faltan las variables de configuración de Supabase. Revisa config.js.');
+}
+
+const Supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: true },
+});
+
+window.__glcbcSupabase = Supabase;
 
 const Http = (() => {
   async function injectHeaders(headers = {}) {
@@ -33,8 +44,8 @@ const Http = (() => {
   }
 
   async function request(path, { method = 'GET', body, headers = {}, raw = false } = {}) {
-    if (!USE_REMOTE_API) {
-      throw new Error('La API remota no está configurada.');
+    if (!API_BASE) {
+      throw new Error('No se configuró window.__GLCBC_API_BASE__. Revisa config.js.');
     }
     const options = { method, headers: await injectHeaders(headers) };
     if (body !== undefined) {
@@ -137,118 +148,6 @@ const Utils = (() => {
 
   return { nowISO, uid, formatDate, formatMoney, percent, escapeHtml, clone, daysBetween, fileToDataUrl };
 })();
-
-function createLocalSupabaseClient() {
-  const USERS_KEY = `glcbc:localUsers:${ORG_SLUG}`;
-  const SESSION_KEY = `glcbc:localSession:${ORG_SLUG}`;
-
-  function readUsers() {
-    try {
-      const raw = localStorage.getItem(USERS_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch (error) {
-      console.warn('No se pudieron leer usuarios locales.', error);
-      return [];
-    }
-  }
-
-  function writeUsers(users) {
-    try {
-      localStorage.setItem(USERS_KEY, JSON.stringify(users));
-    } catch (error) {
-      console.warn('No se pudieron guardar usuarios locales.', error);
-    }
-  }
-
-  function readSession() {
-    try {
-      const raw = localStorage.getItem(SESSION_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch (error) {
-      console.warn('No se pudo leer la sesión local.', error);
-      return null;
-    }
-  }
-
-  function writeSession(session) {
-    try {
-      if (session) {
-        localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-      } else {
-        localStorage.removeItem(SESSION_KEY);
-      }
-    } catch (error) {
-      console.warn('No se pudo actualizar la sesión local.', error);
-    }
-  }
-
-  async function getCurrentUser() {
-    const session = readSession();
-    if (!session?.userId) return null;
-    const user = readUsers().find((item) => item.id === session.userId);
-    return user || null;
-  }
-
-  return {
-    auth: {
-      async getUser() {
-        return { data: { user: await getCurrentUser() }, error: null };
-      },
-      async getSession() {
-        const user = await getCurrentUser();
-        if (!user) return { data: { session: null }, error: null };
-        return { data: { session: { user, access_token: null } }, error: null };
-      },
-      async signInWithPassword({ email, password }) {
-        const users = readUsers();
-        const user = users.find((item) => item.email === email && item.password === password);
-        if (!user) {
-          return { data: null, error: { message: 'Credenciales inválidas.' } };
-        }
-        writeSession({ userId: user.id });
-        user.updated_at = new Date().toISOString();
-        writeUsers(users);
-        return { data: { user }, error: null };
-      },
-      async signUp({ email, password, options }) {
-        const users = readUsers();
-        if (users.some((item) => item.email === email)) {
-          return { data: null, error: { message: 'El correo ya está registrado.' } };
-        }
-        const now = new Date().toISOString();
-        const user = {
-          id: Utils.uid('user'),
-          email,
-          password,
-          created_at: now,
-          updated_at: now,
-          user_metadata: options?.data || {},
-        };
-        users.push(user);
-        writeUsers(users);
-        writeSession({ userId: user.id });
-        return { data: { user }, error: null };
-      },
-      async signOut() {
-        writeSession(null);
-        return { error: null };
-      },
-    },
-  };
-}
-
-if (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY) {
-  Supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: { persistSession: true },
-  });
-} else {
-  if (!window.supabase || !SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    console.warn('Supabase no está configurado. Se usará modo local sin conexión.');
-  }
-  Supabase = createLocalSupabaseClient();
-}
-
-window.__glcbcSupabase = Supabase;
 
 const Auth = (() => {
   const USER_KEY = 'glcbc:user';
@@ -379,7 +278,6 @@ const Roles = {
     crm: ['admin', 'socio_fundador', 'socio_mayorista', 'socio', 'asociado'],
     directory: ['admin', 'socio_fundador', 'socio_mayorista', 'socio', 'asociado', 'abogado_asociado'],
     documents: ['admin', 'socio_fundador', 'socio_mayorista', 'socio', 'asociado', 'abogado_asociado'],
-    clients: ['admin', 'socio_fundador', 'socio_mayorista', 'socio', 'asociado'],
     reports: ['admin', 'socio_fundador', 'socio_mayorista'],
     profile: ALL_ROLES,
     notifications: ALL_ROLES,
@@ -495,466 +393,7 @@ const UI = (() => {
 // ---------------------------------------------------------------------------
 // DataService: persistencia y sincronización
 // ---------------------------------------------------------------------------
-const LocalDataService = (() => {
-  const STORAGE_KEY = `glcbc:state:${ORG_SLUG}`;
-  let cache = null;
-
-  function createDefaultState() {
-    const now = Utils.nowISO();
-    return {
-      parameters: {
-        pjudThresholdDays: 2,
-        staleCaseDays: 7,
-        iva: 0.19,
-        ufValue: 36000,
-      },
-      users: [],
-      cases: [],
-      caseNotes: [],
-      tasks: [],
-      documents: [],
-      fees: [],
-      feeSplits: [],
-      events: [
-        {
-          id: Utils.uid('evt'),
-          title: 'Reunión general',
-          description: 'Planificación semanal',
-          start: now,
-          end: now,
-          visibility: 'todos',
-          participantIds: [],
-          ownerId: null,
-          createdAt: now,
-        },
-      ],
-      contacts: [],
-      notifications: [],
-      notificationPrefs: [],
-      chats: [
-        {
-          id: 'chat_general',
-          title: 'Equipo GL-CBC',
-          participantIds: [],
-          createdAt: now,
-          autoJoin: true,
-        },
-      ],
-      chatMessages: [],
-      offices: [
-        { id: 'office_quilpue', name: 'Quilpué — Thompson 889', address: 'Quilpué' },
-        { id: 'office_santiago', name: 'Santiago — Oficina central', address: 'Santiago' },
-      ],
-      officeBookings: [],
-      meetings: [],
-      approvals: [],
-      audit: [],
-      accountRequests: [],
-    };
-  }
-
-  function persist() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(cache));
-    } catch (error) {
-      console.warn('No se pudo persistir el estado local.', error);
-    }
-  }
-
-  function ensureCache() {
-    if (cache) return cache;
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        cache = JSON.parse(stored);
-      }
-    } catch (error) {
-      console.warn('No se pudo leer el estado local. Se usará el predeterminado.', error);
-    }
-    if (!cache) {
-      cache = createDefaultState();
-      persist();
-    }
-    return cache;
-  }
-
-  function currentUserId() {
-    return Auth.getProfile()?.id || null;
-  }
-
-  function pushAudit(entry) {
-    const state = ensureCache();
-    state.audit.push({
-      id: Utils.uid('audit'),
-      createdAt: Utils.nowISO(),
-      ...entry,
-    });
-  }
-
-  const handlers = {
-    'audit.add': ({ userId = null, type, message, payload = null }) => {
-      pushAudit({ userId, type, message, payload });
-    },
-    'approvals.queue': ({ userId, action, entityId, entityType, reason }) => {
-      const state = ensureCache();
-      state.approvals.push({
-        id: Utils.uid('approval'),
-        userId,
-        action,
-        entityId,
-        entityType,
-        reason,
-        status: 'pending',
-        createdAt: Utils.nowISO(),
-      });
-    },
-    'approvals.resolve': ({ approvalId, approved, comment }) => {
-      const state = ensureCache();
-      const approval = state.approvals.find((item) => item.id === approvalId);
-      if (!approval) {
-        throw new Error('Autorización no encontrada.');
-      }
-      approval.status = approved ? 'approved' : 'rejected';
-      approval.comment = comment || null;
-      approval.resolvedAt = Utils.nowISO();
-    },
-    'notifications.send': ({ userIds = null, title, body, channel }) => {
-      const state = ensureCache();
-      state.notifications.push({
-        id: Utils.uid('notif'),
-        userIds,
-        title,
-        body,
-        channel: channel || 'app',
-        createdAt: Utils.nowISO(),
-      });
-    },
-    'users.upsertProfile': ({ id, email, name, role }) => {
-      const state = ensureCache();
-      let user = state.users.find((item) => item.id === id);
-      if (!user) {
-        user = {
-          id,
-          email,
-          createdAt: Utils.nowISO(),
-          phone: '',
-          timezone: 'America/Santiago',
-          status: 'active',
-          role: role || 'cliente',
-          name: name || email,
-        };
-        state.users.push(user);
-      }
-      user.email = email || user.email;
-      user.name = name || user.name;
-      if (role) user.role = role;
-      const general = state.chats.find((thread) => thread.autoJoin);
-      if (general && !general.participantIds.includes(id)) {
-        general.participantIds.push(id);
-      }
-      if (user.role === 'cliente' && email && !state.contacts.some((contact) => contact.email === email)) {
-        state.contacts.push({
-          id: Utils.uid('contact'),
-          type: 'cliente',
-          name: name || email,
-          email,
-          phone: '',
-          createdAt: Utils.nowISO(),
-        });
-      }
-    },
-    'cases.create': (payload = {}) => {
-      const state = ensureCache();
-      const now = Utils.nowISO();
-      const assigned = Array.isArray(payload.assignedUserIds) && payload.assignedUserIds.length ? payload.assignedUserIds : [];
-      if (!assigned.length && currentUserId()) {
-        assigned.push(currentUserId());
-      }
-      state.cases.push({
-        id: Utils.uid('case'),
-        name: payload.name || 'Causa sin nombre',
-        clientUserId: payload.clientUserId || null,
-        summary: payload.summary || '',
-        number: payload.number || null,
-        category: payload.category || 'otro',
-        status: payload.status || 'iniciado',
-        tags: Array.isArray(payload.tags) ? payload.tags : [],
-        court: payload.court || '',
-        assignedUserIds: assigned,
-        createdAt: now,
-        updatedAt: now,
-        lastActivityAt: now,
-        lastReviewedAt: now,
-        archivedAt: null,
-      });
-    },
-    'cases.update': ({ caseId, ...changes }) => {
-      const state = ensureCache();
-      const caseItem = state.cases.find((item) => item.id === caseId);
-      if (!caseItem) throw new Error('Causa no encontrada.');
-      Object.assign(caseItem, changes);
-      caseItem.updatedAt = Utils.nowISO();
-      caseItem.lastActivityAt = Utils.nowISO();
-    },
-    'cases.markReviewed': ({ caseId, novelty, note, onlyReviewed }) => {
-      const state = ensureCache();
-      const caseItem = state.cases.find((item) => item.id === caseId);
-      if (!caseItem) throw new Error('Causa no encontrada.');
-      caseItem.lastReviewedAt = Utils.nowISO();
-      if (!onlyReviewed || novelty === 'yes') {
-        caseItem.lastActivityAt = Utils.nowISO();
-      }
-      if (note || novelty === 'yes') {
-        state.caseNotes.push({
-          id: Utils.uid('note'),
-          caseId,
-          userId: currentUserId(),
-          novelty: novelty === 'yes',
-          note: note || '',
-          createdAt: Utils.nowISO(),
-        });
-      }
-    },
-    'tasks.create': ({ caseId, name, dueDate, assigneeId, visibleToClient }) => {
-      const state = ensureCache();
-      const caseItem = state.cases.find((item) => item.id === caseId);
-      if (!caseItem) throw new Error('Causa no encontrada.');
-      state.tasks.push({
-        id: Utils.uid('task'),
-        caseId,
-        name,
-        dueDate,
-        assigneeId: assigneeId || currentUserId(),
-        visibleToClient: Boolean(visibleToClient),
-        status: 'pending',
-        createdAt: Utils.nowISO(),
-      });
-      caseItem.lastActivityAt = Utils.nowISO();
-    },
-    'tasks.complete': ({ taskId }) => {
-      const state = ensureCache();
-      const task = state.tasks.find((item) => item.id === taskId);
-      if (!task) throw new Error('Tarea no encontrada.');
-      task.status = 'done';
-      task.completedAt = Utils.nowISO();
-      const caseItem = state.cases.find((item) => item.id === task.caseId);
-      if (caseItem) caseItem.lastActivityAt = Utils.nowISO();
-    },
-    'documents.create': (payload = {}) => {
-      const state = ensureCache();
-      const caseItem = state.cases.find((item) => item.id === payload.caseId);
-      if (!caseItem) throw new Error('Causa no encontrada.');
-      state.documents.push({
-        id: Utils.uid('doc'),
-        caseId: payload.caseId,
-        title: payload.title || 'Documento',
-        description: payload.description || '',
-        category: payload.category || 'otro',
-        visibleToClient: Boolean(payload.visibleToClient),
-        fileName: payload.fileName || null,
-        mimeType: payload.mimeType || null,
-        size: payload.size || 0,
-        dataUrl: payload.dataUrl || null,
-        uploadedById: currentUserId(),
-        createdAt: Utils.nowISO(),
-      });
-      caseItem.lastActivityAt = Utils.nowISO();
-    },
-    'documents.toggleVisibility': ({ docId }) => {
-      const state = ensureCache();
-      const doc = state.documents.find((item) => item.id === docId);
-      if (!doc) throw new Error('Documento no encontrado.');
-      doc.visibleToClient = !doc.visibleToClient;
-    },
-    'fees.create': ({ caseId, concept, amount, iva, currency, dueDate, splits = [] }) => {
-      const state = ensureCache();
-      const caseItem = state.cases.find((item) => item.id === caseId);
-      if (!caseItem) throw new Error('Causa no encontrada.');
-      const feeId = Utils.uid('fee');
-      const createdAt = Utils.nowISO();
-      state.fees.push({
-        id: feeId,
-        caseId,
-        concept: concept || 'Honorario',
-        amount: Number(amount) || 0,
-        iva: iva ?? state.parameters.iva,
-        currency: currency || 'CLP',
-        dueDate: dueDate || null,
-        status: 'pending',
-        createdAt,
-      });
-      splits
-        .filter((split) => split.userId)
-        .forEach((split) => {
-          state.feeSplits.push({
-            id: Utils.uid('split'),
-            feeId,
-            userId: split.userId,
-            percent: Number(split.percent) || 0,
-            createdAt,
-          });
-        });
-      caseItem.lastActivityAt = Utils.nowISO();
-    },
-    'notificationPrefs.save': ({ userId, email, push, whatsapp }) => {
-      const state = ensureCache();
-      const existing = state.notificationPrefs.find((item) => item.userId === userId);
-      if (existing) {
-        existing.email = Boolean(email);
-        existing.push = Boolean(push);
-        existing.whatsapp = Boolean(whatsapp);
-        existing.updatedAt = Utils.nowISO();
-      } else {
-        state.notificationPrefs.push({
-          id: Utils.uid('pref'),
-          userId,
-          email: Boolean(email),
-          push: Boolean(push),
-          whatsapp: Boolean(whatsapp),
-          createdAt: Utils.nowISO(),
-        });
-      }
-    },
-    'chat.postMessage': ({ threadId, body }) => {
-      const state = ensureCache();
-      let thread = state.chats.find((item) => item.id === threadId);
-      if (!thread) {
-        thread = {
-          id: threadId,
-          title: 'Conversación',
-          participantIds: [currentUserId()].filter(Boolean),
-          createdAt: Utils.nowISO(),
-        };
-        state.chats.push(thread);
-      }
-      if (currentUserId() && !thread.participantIds.includes(currentUserId())) {
-        thread.participantIds.push(currentUserId());
-      }
-      state.chatMessages.push({
-        id: Utils.uid('msg'),
-        threadId,
-        userId: currentUserId(),
-        body,
-        createdAt: Utils.nowISO(),
-      });
-    },
-    'offices.book': ({ officeId, start, end, reason }) => {
-      const state = ensureCache();
-      const startDate = new Date(start);
-      const endDate = new Date(end);
-      if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate <= startDate) {
-        throw new Error('Rango horario inválido.');
-      }
-      const overlap = state.officeBookings.some((booking) => {
-        if (booking.officeId !== officeId) return false;
-        const existingStart = new Date(booking.start);
-        const existingEnd = new Date(booking.end);
-        return startDate < existingEnd && endDate > existingStart;
-      });
-      if (overlap) {
-        throw new Error('La oficina ya está reservada en ese horario.');
-      }
-      state.officeBookings.push({
-        id: Utils.uid('booking'),
-        officeId,
-        userId: currentUserId(),
-        start,
-        end,
-        reason,
-        createdAt: Utils.nowISO(),
-      });
-    },
-    'meetings.create': ({ title, start, end, description, caseId, participantIds = [] }) => {
-      const state = ensureCache();
-      const meetingId = Utils.uid('meeting');
-      const participants = Array.from(new Set([currentUserId(), ...participantIds].filter(Boolean)));
-      state.meetings.push({
-        id: meetingId,
-        title,
-        start,
-        end,
-        description: description || '',
-        caseId: caseId || null,
-        participantIds: participants,
-        requestedBy: currentUserId(),
-        status: 'programada',
-        createdAt: Utils.nowISO(),
-      });
-      state.events.push({
-        id: Utils.uid('evt'),
-        title,
-        description: description || '',
-        start,
-        end,
-        caseId: caseId || null,
-        visibility: 'todos',
-        participantIds: participants,
-        ownerId: currentUserId(),
-        createdAt: Utils.nowISO(),
-      });
-    },
-    'accountRequests.create': ({ name, email, phone, role, comment }) => {
-      const state = ensureCache();
-      state.accountRequests.push({
-        id: Utils.uid('accreq'),
-        name: name || '',
-        email,
-        phone: phone || '',
-        role: role || 'cliente',
-        comment: comment || '',
-        status: 'pending',
-        createdAt: Utils.nowISO(),
-      });
-    },
-    'accountRequests.resolve': ({ requestId, approved, comment }) => {
-      const state = ensureCache();
-      const request = state.accountRequests.find((item) => item.id === requestId);
-      if (!request) throw new Error('Solicitud no encontrada.');
-      request.status = approved ? 'approved' : 'rejected';
-      request.comment = comment || null;
-      request.resolvedAt = Utils.nowISO();
-    },
-    'settings.update': ({ pjudThresholdDays, staleCaseDays, ufValue, iva }) => {
-      const state = ensureCache();
-      state.parameters.pjudThresholdDays = Number.isFinite(pjudThresholdDays) ? pjudThresholdDays : state.parameters.pjudThresholdDays;
-      state.parameters.staleCaseDays = Number.isFinite(staleCaseDays) ? staleCaseDays : state.parameters.staleCaseDays;
-      state.parameters.ufValue = Number.isFinite(ufValue) ? ufValue : state.parameters.ufValue;
-      state.parameters.iva = Number.isFinite(iva) ? iva : state.parameters.iva;
-      state.parameters.updatedAt = Utils.nowISO();
-    },
-    'profile.update': ({ name, phone }) => {
-      const state = ensureCache();
-      const userId = currentUserId();
-      const user = state.users.find((item) => item.id === userId);
-      if (!user) throw new Error('Usuario no encontrado.');
-      if (name) user.name = name;
-      user.phone = phone || '';
-      user.updatedAt = Utils.nowISO();
-    },
-  };
-
-  async function load() {
-    return ensureCache();
-  }
-
-  async function dispatch(action, payload) {
-    const handler = handlers[action];
-    if (!handler) {
-      throw new Error(`Acción no soportada sin API: ${action}`);
-    }
-    handler(payload || {});
-    persist();
-    return cache;
-  }
-
-  function getState() {
-    return ensureCache();
-  }
-
-  return { load, getState, dispatch };
-})();
-
-const RemoteDataService = (() => {
+const DataService = (() => {
   let cache = null;
 
   async function load() {
@@ -975,8 +414,6 @@ const RemoteDataService = (() => {
 
   return { load, getState, dispatch };
 })();
-
-const DataService = USE_REMOTE_API ? RemoteDataService : LocalDataService;
 
 // ---------------------------------------------------------------------------
 // Servicios de dominio: auditoría, autorizaciones, notificaciones
@@ -1084,32 +521,22 @@ window.requestAccount = async function requestAccount() {
       phone: document.getElementById('regPhone')?.value,
       comment: document.getElementById('regComment')?.value,
     });
-    if (USE_REMOTE_API) {
-      try {
-        await Http.request('/actions', {
-          method: 'POST',
-          body: {
-            action: 'accountRequests.create',
-            payload: {
-              name,
-              email,
-              phone: document.getElementById('regPhone')?.value,
-              role,
-              comment: document.getElementById('regComment')?.value,
-            },
+    try {
+      await Http.request('/actions', {
+        method: 'POST',
+        body: {
+          action: 'accountRequests.create',
+          payload: {
+            name,
+            email,
+            phone: document.getElementById('regPhone')?.value,
+            role,
+            comment: document.getElementById('regComment')?.value,
           },
-        });
-      } catch (error) {
-        console.warn('No se pudo guardar la solicitud en el estado central', error);
-      }
-    } else {
-      await DataService.dispatch('accountRequests.create', {
-        name,
-        email,
-        phone: document.getElementById('regPhone')?.value,
-        role,
-        comment: document.getElementById('regComment')?.value,
+        },
       });
+    } catch (error) {
+      console.warn('No se pudo guardar la solicitud en el estado central', error);
     }
     showStatus(response.message || '✅ Solicitud enviada. Revisa tu correo.', 'success');
   } catch (error) {
@@ -1180,16 +607,7 @@ const Portal = (() => {
     window.switchModule = switchModule;
     window.toggleAddCaseForm = () => toggleSection('addCaseContainer');
     window.toggleAddDocumentForm = () => toggleSection('addDocumentContainer');
-    window.toggleAddClientForm = () => toggleSection('addClientContainer');
-    window.toggleAddGlobalDocForm = () => toggleSection('addGlobalDocContainer');
-    window.toggleAddDirectoryForm = () => toggleSection('addDirectoryContainer');
-    window.toggleAddEventForm = () => toggleSection('addEventContainer');
     window.backToCases = () => switchModule('cases');
-    window.markReviewedFromCase = () => {
-      if (activeCaseId) {
-        promptReview(activeCaseId);
-      }
-    };
     document.getElementById('addCaseForm')?.addEventListener('submit', handleCreateCase);
     document.getElementById('addTaskForm')?.addEventListener('submit', handleAddTask);
     document.getElementById('addDocumentForm')?.addEventListener('submit', handleAddDocument);
@@ -1202,7 +620,6 @@ const Portal = (() => {
     document.getElementById('authorizationsList')?.addEventListener('click', handleAuthorizationDecision);
     document.getElementById('chatForm')?.addEventListener('submit', handleChatMessage);
     document.getElementById('documentsUploadForm')?.addEventListener('submit', handleClientDocumentUpload);
-    document.getElementById('showBookingFormBtn')?.addEventListener('click', () => toggleSection('bookingFormContainer'));
     window.addEventListener('hashchange', () => {
       const hash = location.hash.replace('#', '');
       if (hash && hash !== activeModule) switchModule(hash);
@@ -1221,7 +638,7 @@ const Portal = (() => {
     Object.entries(Roles.MODULE_ACCESS).forEach(([module, allowed]) => {
       const btn = document.getElementById(`nav-${module}`);
       if (!btn) return;
-      btn.style.display = allowed.includes(role) ? '' : 'none';
+      btn.style.display = allowed.includes(role) ? 'block' : 'none';
     });
   }
 
@@ -1264,9 +681,6 @@ const Portal = (() => {
         break;
       case 'documents':
         renderDocuments();
-        break;
-      case 'clients':
-        renderCRM();
         break;
       case 'crm':
         renderCRM();
@@ -1871,7 +1285,7 @@ const Portal = (() => {
 
   // --------------------------- Documentos global -------------------------
   function renderDocuments() {
-    const list = document.getElementById('documentsGlobalList') || document.getElementById('globalDocumentsList');
+    const list = document.getElementById('documentsGlobalList');
     if (!list) return;
     const docs = state.documents;
     list.innerHTML = docs.length
@@ -1922,18 +1336,12 @@ const Portal = (() => {
 
   // --------------------------- CRM / Directorio -------------------------
   function renderCRM() {
-    const list = document.getElementById('crmList') || document.getElementById('clientsList');
+    const list = document.getElementById('crmList');
     if (!list) return;
-    const contacts = state.contacts.filter((contact) => (contact.type || '').toLowerCase().includes('client'));
-    const dataset = contacts.length ? contacts : state.contacts;
-    list.innerHTML = dataset.length
-      ? dataset
-          .map(
-            (contact) =>
-              `<div class="item"><strong>${Utils.escapeHtml(contact.name)}</strong> (${Utils.escapeHtml(contact.email || 'Sin correo')}) · ${Utils.escapeHtml(contact.phone || 'Sin teléfono')}</div>`
-          )
-          .join('')
-      : '<p class="empty">Aún no hay clientes registrados.</p>';
+    const contacts = state.contacts;
+    list.innerHTML = contacts.length
+      ? contacts.map((contact) => `<div class="item"><strong>${Utils.escapeHtml(contact.name)}</strong> (${Utils.escapeHtml(contact.type || 'contacto')}) · ${Utils.escapeHtml(contact.email || 'Sin correo')}</div>`).join('')
+      : '<p class="empty">Aún no hay contactos.</p>';
   }
 
   function renderDirectory() {
