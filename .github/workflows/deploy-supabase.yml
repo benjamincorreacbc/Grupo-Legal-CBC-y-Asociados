@@ -1,0 +1,33 @@
+name: deploy-supabase
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/**'
+      - '.github/workflows/deploy-supabase.yml'
+
+jobs:
+  missing-secrets:
+    runs-on: ubuntu-latest
+    if: ${{ secrets.SUPABASE_ACCESS_TOKEN == '' || secrets.SUPABASE_PROJECT_REF == '' }}
+    steps:
+      - run: |
+          echo "Supabase deployment skipped: configure SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF repository secrets."
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ secrets.SUPABASE_ACCESS_TOKEN != '' && secrets.SUPABASE_PROJECT_REF != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Deploy edge function
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          supabase functions deploy portal --project-ref "$SUPABASE_PROJECT_REF"

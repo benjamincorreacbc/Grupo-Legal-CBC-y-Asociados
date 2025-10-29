@@ -1,0 +1,4 @@
+project_id = "YOUR-PROJECT-REF"
+
+[functions.portal]
+verify_jwt = true
