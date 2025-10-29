@@ -10,10 +10,12 @@
     .card { background:#121821; border:1px solid #1d2733; border-radius:12px; padding:16px; box-shadow:0 6px 24px rgba(0,0,0,.24); }
     label, select, button { display:block; width:100%; margin-top:10px; }
     select, button { padding:10px 12px; border-radius:10px; border:1px solid #2a394b; background:#233142; color:#e7edf3; }
-    button:hover { filter:brightness(1.08); cursor:pointer; }
+    button[disabled] { opacity:.7; cursor:progress; }
+    button:hover:not([disabled]) { filter:brightness(1.08); cursor:pointer; }
     .muted { opacity:.8; font-size:.95rem; }
     .ok { color:#9ae6b4; margin-top:10px; }
     .err { color:#feb2b2; margin-top:10px; }
+    a { color:#8ab4ff; }
   </style>
 </head>
 <body>
@@ -37,85 +39,4 @@
       <p id="msg"></p>
 
       <p class="muted" style="margin-top:14px">
-        Tu correo: <span id="email">—</span><br/>
-        Rol actual: <span id="current">—</span>
-      </p>
-
-      <p style="margin-top:14px">
-        <a href="dashboard.html">Ir al dashboard</a> ·
-        <a href="login.html">Volver a login</a>
-      </p>
-    </div>
-  </div>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js"></script>
-  <script src="app.js"></script>
-  <script>
-    const ROLE_MAP = {
-      'Admin': 'admin',
-      'Socio Fundador': 'socio_fundador',
-      'Socio Mayorista': 'socio_mayorista',
-      'Socio': 'socio',
-      'Asociado': 'asociado',
-      'Abogado Asociado': 'abogado_asociado',
-      'Cliente': 'cliente',
-    };
-
-    const LABEL_MAP = Object.fromEntries(Object.entries(ROLE_MAP).map(([label, value]) => [value, label]));
-
-    (async () => {
-      try {
-        const profile = await Auth.ensure();
-        if (!profile) {
-          window.location.href = 'login.html';
-          return;
-        }
-        document.getElementById('email').textContent = profile.email;
-        document.getElementById('current').textContent = profile.role || '—';
-        const select = document.getElementById('role');
-        select.value = LABEL_MAP[profile.role] || 'Cliente';
-
-        document.getElementById('save').onclick = async () => {
-          const label = select.value;
-          const msg = document.getElementById('msg');
-          msg.textContent = 'Guardando…';
-          msg.className = '';
-          try {
-            const role = ROLE_MAP[label] || 'cliente';
-            const { error } = await window.__glcbcSupabase.auth.updateUser({ data: { role } });
-            if (error) {
-              throw new Error(error.message || 'No se pudo actualizar tu rol en Supabase');
-            }
-            await Http.request('/actions', {
-              method: 'POST',
-              body: {
-                action: 'users.upsertProfile',
-                payload: {
-                  id: profile.id,
-                  email: profile.email,
-                  name: profile.name,
-                  role,
-                },
-              },
-            });
-            Auth.setProfile({ ...profile, role });
-            msg.textContent = `✅ Rol actualizado a: ${role}`;
-            msg.className = 'ok';
-            document.getElementById('current').textContent = role;
-          } catch (error) {
-            console.error(error);
-            msg.textContent = error.message || 'No se pudo guardar el rol';
-            msg.className = 'err';
-          }
-        };
-      } catch (error) {
-        console.error(error);
-        document.getElementById('msg').textContent = error.message || 'Error al cargar tu perfil.';
-        document.getElementById('msg').className = 'err';
-        setTimeout(() => (window.location.href = 'login.html'), 2000);
-      }
-    })();
-  </script>
-</body>
-</html>
+        Tu correo: <span id="email">—</
