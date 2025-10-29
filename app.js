@@ -200,8 +200,11 @@ function createLocalSupabaseClient() {
         return { data: { session: { user, access_token: null } }, error: null };
       },
       async signInWithPassword({ email, password }) {
+        const normalizedEmail = (email || '').trim().toLowerCase();
         const users = readUsers();
-        const user = users.find((item) => item.email === email && item.password === password);
+        const user = users.find(
+          (item) => item.email && item.email.toLowerCase() === normalizedEmail && item.password === password,
+        );
         if (!user) {
           return { data: null, error: { message: 'Credenciales inválidas.' } };
         }
@@ -211,14 +214,15 @@ function createLocalSupabaseClient() {
         return { data: { user }, error: null };
       },
       async signUp({ email, password, options }) {
+        const normalizedEmail = (email || '').trim().toLowerCase();
         const users = readUsers();
-        if (users.some((item) => item.email === email)) {
+        if (users.some((item) => item.email && item.email.toLowerCase() === normalizedEmail)) {
           return { data: null, error: { message: 'El correo ya está registrado.' } };
         }
         const now = new Date().toISOString();
         const user = {
           id: Utils.uid('user'),
-          email,
+          email: normalizedEmail,
           password,
           created_at: now,
           updated_at: now,
@@ -308,7 +312,8 @@ const Auth = (() => {
   }
 
   async function login(email, password) {
-    const { data, error } = await Supabase.auth.signInWithPassword({ email, password });
+    const normalizedEmail = (email || '').trim().toLowerCase();
+    const { data, error } = await Supabase.auth.signInWithPassword({ email: normalizedEmail, password });
     if (error) {
       throw new Error(error.message || 'No se pudo iniciar sesión');
     }
@@ -324,8 +329,9 @@ const Auth = (() => {
       phone: phone || null,
       comment: comment || null,
     };
+    const normalizedEmail = (email || '').trim().toLowerCase();
     const { data, error } = await Supabase.auth.signUp({
-      email,
+      email: normalizedEmail,
       password,
       options: {
         data: metadata,
@@ -1065,7 +1071,7 @@ function showStatus(message, kind = 'error') {
 
 window.loginUser = async function loginUser() {
   try {
-    const email = document.getElementById('loginEmail')?.value?.trim();
+    const email = document.getElementById('loginEmail')?.value?.trim().toLowerCase();
     const password = document.getElementById('loginPassword')?.value;
     if (!email || !password) {
       showStatus('Completa correo y contraseña.');
@@ -1083,7 +1089,7 @@ window.loginUser = async function loginUser() {
 window.requestAccount = async function requestAccount() {
   try {
     const name = document.getElementById('regName')?.value?.trim();
-    const email = document.getElementById('regEmail')?.value?.trim();
+    const email = document.getElementById('regEmail')?.value?.trim().toLowerCase();
     const pass = document.getElementById('regPassword')?.value;
     const confirm = document.getElementById('regConfirm')?.value;
     const role = document.getElementById('regRole')?.value;
