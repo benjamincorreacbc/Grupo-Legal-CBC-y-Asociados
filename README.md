@@ -101,7 +101,12 @@ subdominios automáticos), sigue estos pasos específicos:
 - El workflow `.github/workflows/package.yml` genera un archivo `glcbc-portal.zip` automáticamente y lo deja disponible como artefacto en la pestaña **Actions**.
 - Alternativamente, en la pestaña **Code** de GitHub puedes usar el botón **Download ZIP** para bajar todo el repositorio sin utilizar la línea de comandos.
 
-### 4.2. Despliegue automático de la Edge Function
+### 4.2. Fusión de ramas desde GitHub (sin usar consola)
+
+- El workflow `.github/workflows/merge-branches.yml` te permite fusionar la rama `work` (o cualquier otra) en `main` directamente desde la pestaña **Actions**.
+- Pulsa **Run workflow**, elige las ramas si deseas cambiar los valores por defecto y espera a que finalice. Si alguna rama no existe, el flujo se detendrá de forma segura y dejará un mensaje en el resumen.
+
+### 4.3. Despliegue automático de la Edge Function
 
 1. En tu repositorio de GitHub abre `Settings → Secrets and variables → Actions` y crea dos secretos:
    - `SUPABASE_ACCESS_TOKEN`: lo obtienes en Supabase (`Account Settings → Access Tokens`).

@@ -1,0 +1,72 @@
+name: merge-work-into-main
+
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "Branch que quieres fusionar (default: work)"
+        required: false
+        default: work
+      target:
+        description: "Branch destino (default: main)"
+        required: false
+        default: main
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      should-merge: ${{ steps.check.outputs.should_merge }}
+      source: ${{ steps.parse.outputs.source }}
+      target: ${{ steps.parse.outputs.target }}
+    steps:
+      - name: Normalizar parámetros
+        id: parse
+        run: |
+          source="${{ github.event.inputs.source || 'work' }}"
+          target="${{ github.event.inputs.target || 'main' }}"
+          echo "source=${source}" >> "$GITHUB_OUTPUT"
+          echo "target=${target}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verificar ramas existentes
+        id: check
+        run: |
+          set -e
+          source="${{ steps.parse.outputs.source }}"
+          target="${{ steps.parse.outputs.target }}"
+          if git ls-remote --exit-code origin "refs/heads/${source}" >/dev/null 2>&1 && \
+             git ls-remote --exit-code origin "refs/heads/${target}" >/dev/null 2>&1; then
+            echo "Ambas ramas existen (source=${source}, target=${target})." >> "$GITHUB_STEP_SUMMARY"
+            echo "should_merge=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No se encontraron ambas ramas en el repositorio remoto." >> "$GITHUB_STEP_SUMMARY"
+            echo "should_merge=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  merge:
+    runs-on: ubuntu-latest
+    needs: prepare
+    if: needs.prepare.outputs.should-merge == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fusionar ramas
+        uses: peter-evans/merge-branch@v3
+        with:
+          head: ${{ needs.prepare.outputs.source }}
+          base: ${{ needs.prepare.outputs.target }}
+          commit_message: "Merge branch '${{ needs.prepare.outputs.source }}' into ${{ needs.prepare.outputs.target }}"
+      - name: Reporte final
+        run: |
+          echo "Se fusionó '${{ needs.prepare.outputs.source }}' en '${{ needs.prepare.outputs.target }}'." >> "$GITHUB_STEP_SUMMARY"
+
+  skip:
+    runs-on: ubuntu-latest
+    needs: prepare
+    if: needs.prepare.outputs.should-merge != 'true'
+    steps:
+      - run: |
+          echo "No se realizó la fusión automática porque falta alguna de las ramas requeridas." >> "$GITHUB_STEP_SUMMARY"
