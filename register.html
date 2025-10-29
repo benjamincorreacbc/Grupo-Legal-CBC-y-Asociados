@@ -40,14 +40,34 @@
             </p>
         </div>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
-    <script src="app.js"></script>
-    <script>
-        document.getElementById('registerForm').addEventListener('submit', function (e) {
-            e.preventDefault();
-            requestAccount();
-        });
+    <script type="module">
+        import { requestAccount } from './js/auth.js';
+
+        const form = document.getElementById('registerForm');
+        if (form) {
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const fullName = document.getElementById('regName').value.trim();
+                const email = document.getElementById('regEmail').value.trim();
+                const password = document.getElementById('regPassword').value;
+                const confirm = document.getElementById('regConfirm').value;
+                const requestedRole = document.getElementById('regRole').value;
+
+                if (password !== confirm) {
+                    alert('Las contraseñas no coinciden');
+                    return;
+                }
+
+                try {
+                    await requestAccount({ email, password, fullName, requestedRole });
+                    alert('Solicitud enviada. Revisa tu correo para confirmar la cuenta.');
+                    window.location.href = './login.html';
+                } catch (error) {
+                    alert(error.message || 'No se pudo registrar la cuenta');
+                }
+            });
+        }
     </script>
 </body>
 </html>

@@ -1,98 +1,62 @@
-import { serve } from 'https://deno.land/std@0.204.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2?target=deno';
-import { executeAction } from './actions.ts';
-import { readState } from './stateStore.ts';
-import { filterStateForUser } from './utils.ts';
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-glcbc-org',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET,POST,OPTIONS"
 };
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
-const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-const DEFAULT_SLUG = Deno.env.get('GLCBC_ORG_SLUG') || 'glcbc';
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
 
-if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-  throw new Error('Faltan SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY en el entorno.');
-}
+  try {
+    const url = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseAdmin = createClient(url, serviceKey);
 
-const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-  auth: { persistSession: false },
+    const body = await req.json().catch(() => ({}));
+    const action = body?.action;
+
+    const auth = req.headers.get("authorization") ?? "";
+    const jwt = auth.startsWith("Bearer ") ? auth.slice(7) : null;
+
+    if (action === "set_role") {
+      const role = body?.role;
+      if (!role) {
+        return json({ error: "role requerido" }, 400);
+      }
+      if (!jwt) {
+        return json({ error: "JWT faltante" }, 401);
+      }
+      const { data: userInfo, error: userErr } = await supabaseAdmin.auth.getUser(jwt);
+      if (userErr || !userInfo?.user) {
+        return json({ error: "Usuario no válido" }, 401);
+      }
+      const userId = userInfo.user.id;
+
+      const { error: upErr } = await supabaseAdmin
+        .from("profiles")
+        .update({ role })
+        .eq("id", userId);
+
+      if (upErr) {
+        return json({ error: upErr.message }, 400);
+      }
+      return json({ ok: true });
+    }
+
+    return json({ error: "acción no soportada" }, 404);
+  } catch (e) {
+    return json({ error: e?.message ?? "error" }, 500);
+  }
 });
 
-async function resolveUser(request: Request) {
-  const authorization = request.headers.get('authorization');
-  if (!authorization || !authorization.toLowerCase().startsWith('bearer ')) {
-    return null;
-  }
-  const token = authorization.slice(7);
-  const { data, error } = await adminClient.auth.getUser(token);
-  if (error || !data?.user) {
-    return null;
-  }
-  const user = data.user;
-  return {
-    id: user.id,
-    email: user.email,
-    name: (user.user_metadata as any)?.name || user.email || 'Usuario',
-    role: (user.user_metadata as any)?.role || 'cliente',
-    metadata: user.user_metadata,
-  };
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" }
+  });
 }
-
-function withCors(init: ResponseInit = {}) {
-  return {
-    ...init,
-    headers: {
-      'content-type': 'application/json; charset=utf-8',
-      ...corsHeaders,
-      ...init.headers,
-    },
-  } satisfies ResponseInit;
-}
-
-function json(data: unknown, init: ResponseInit = {}) {
-  return new Response(JSON.stringify(data), withCors(init));
-}
-
-function errorResponse(message: string, status = 400) {
-  return json({ message }, { status });
-}
-
-serve(async (request) => {
-  try {
-    if (request.method === 'OPTIONS') {
-      return new Response('ok', withCors());
-    }
-
-    const url = new URL(request.url);
-    const pathname = url.pathname.replace(/\/*$/, '');
-    const slug = request.headers.get('x-glcbc-org') || DEFAULT_SLUG;
-    if (request.method === 'GET' && pathname.endsWith('/state')) {
-      const user = await resolveUser(request);
-      if (!user) {
-        return errorResponse('No autorizado', 401);
-      }
-      const { state } = await readState(adminClient, slug);
-      return json({ state: filterStateForUser(state, user) });
-    }
-
-    if (request.method === 'POST' && pathname.endsWith('/actions')) {
-      const user = await resolveUser(request);
-      const body = await request.json().catch(() => null);
-      if (!body || typeof body.action !== 'string') {
-        return errorResponse('Solicitud inválida', 400);
-      }
-      const result = await executeAction(adminClient, slug, body.action, body.payload ?? {}, { user });
-      return json({ state: filterStateForUser(result, user) });
-    }
-
-    return errorResponse('Ruta no encontrada', 404);
-  } catch (error) {
-    console.error('Edge function error', error);
-    const message = error instanceof Error ? error.message : 'Error inesperado';
-    return errorResponse(message, 500);
-  }
-}, { onListen: () => {} });

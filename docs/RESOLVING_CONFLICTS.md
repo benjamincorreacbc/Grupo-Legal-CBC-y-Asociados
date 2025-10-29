@@ -1,6 +1,6 @@
 # Resolver conflictos de fusión en GitHub (paso a paso)
 
-Este instructivo está pensado para cuando GitHub te muestra el banner de "Conflicting files" al intentar mezclar la rama `work` (la rama con todas las mejoras del portal) con `main`. Los ejemplos están basados en los conflictos reales que reportaste en `README.md` y `app.js`.
+Este instructivo está pensado para cuando GitHub te muestra el banner de "Conflicting files" al intentar mezclar la rama `work` (la rama con todas las mejoras del portal) con `main`. Los ejemplos están basados en los conflictos reales que reportaste en `README.md` y `js/app.js`.
 
 ## 1. Abrir el editor de conflictos de GitHub
 
@@ -36,15 +36,15 @@ Para este proyecto la recomendación es **quedarse con el contenido de la rama `
 2. Elimina el bloque antiguo que solo describía los archivos básicos.
 3. Asegúrate de que el archivo final comience con `# Portal Integral GL-CBC — Guía completa (100 % online)` y siga con las secciones numeradas (Configuración de Supabase, Preparar el front-end, etc.).
 
-## 4. Conflictos en `app.js`
+## 4. Conflictos en `js/app.js`
 
-`app.js` ahora contiene toda la lógica del portal (autenticación con Supabase, Edge Function, almacenamiento local de respaldo, formularios dinámicos). En cada conflicto:
+`js/app.js` es el módulo que inicializa la sesión con Supabase, conecta los formularios del dashboard y expone las funciones globales (`switchModule`, `logout`, `toggleAddCaseForm`, etc.). En cada conflicto:
 
-- Quédate con la versión que define `window.GLCBC` y todos los módulos (`auth`, `state`, `ui`, etc.).
-- Verifica que al principio del archivo se cargue la configuración desde `window.__GLCBC_*` y se inicialice el cliente de Supabase.
-- Asegúrate de que el final del archivo registre los manejadores de eventos (`DOMContentLoaded`, listeners de formularios, etc.).
+- Conserva la versión que importa `requireSessionOrRedirect` y la capa de datos desde `./auth.js` y `./data.js`.
+- Verifica que se mantengan las funciones auxiliares como `refreshCases`, los listeners de cada formulario y las asignaciones a `window.*`.
+- Asegúrate de que al final se invoque `switchModule('home')` y `refreshCases()` tras cargar la página.
 
-En otras palabras, elimina cualquier bloque corto o incompleto proveniente de `main` que no incluya toda esta lógica.
+Si aparece un bloque reducido que no contiene estas importaciones ni los listeners, elimínalo y deja la versión completa del módulo.
 
 ## 5. Guardar y continuar
 
@@ -59,8 +59,8 @@ Cuando hayas resuelto todos los archivos:
 
 1. Descarga los cambios de `main` y de `work` (`git fetch origin`).
 2. Cambia a `work` y fusiona `main`: `git checkout work && git merge origin/main`.
-3. Abre `README.md` y `app.js` en un editor, realiza los pasos de arriba y guarda.
-4. Ejecuta `git add README.md app.js`.
+3. Abre `README.md` y `js/app.js` en un editor, realiza los pasos de arriba y guarda.
+4. Ejecuta `git add README.md js/app.js`.
 5. Confirma con `git commit` y sube los cambios: `git push origin work`.
 
 ---

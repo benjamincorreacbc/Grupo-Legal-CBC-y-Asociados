@@ -48,10 +48,10 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
-  <script src="app.js"></script>
-  <script>
+  <script type="module">
+    import { supabase, requireSessionOrRedirect } from './js/auth.js';
+
     const ROLE_MAP = {
       'Admin': 'admin',
       'Socio Fundador': 'socio_fundador',
@@ -61,87 +61,49 @@
       'Abogado Asociado': 'abogado_asociado',
       'Cliente': 'cliente',
     };
-
     const LABEL_MAP = Object.fromEntries(Object.entries(ROLE_MAP).map(([label, value]) => [value, label]));
+    const API_BASE = window.__GLCBC_API_BASE__;
 
-    (async () => {
+    const session = await requireSessionOrRedirect('./login.html');
+    const { data: { user } } = await supabase.auth.getUser();
+    const emailEl = document.getElementById('email');
+    const currentEl = document.getElementById('current');
+    const select = document.getElementById('role');
+    const msg = document.getElementById('msg');
+
+    emailEl.textContent = user?.email ?? '—';
+    const currentRole = user?.user_metadata?.role || 'cliente';
+    const currentLabel = Object.entries(ROLE_MAP).find(([, value]) => value === currentRole)?.[0] || 'Cliente';
+    currentEl.textContent = currentRole;
+    select.value = currentLabel;
+
+    document.getElementById('save').onclick = async () => {
+      msg.textContent = 'Guardando…'; msg.className = '';
       try {
-        const cachedProfile = typeof Auth?.getProfile === 'function' ? Auth.getProfile() : null;
-        let profile = cachedProfile;
-        if (!profile) {
-          profile = await Auth.ensure();
-        } else {
-          Auth.ensure().catch(() => {});
-        }
-        if (!profile) {
-          window.location.href = 'login.html';
-          return;
-        }
+        const selectedLabel = select.value;
+        const role = ROLE_MAP[selectedLabel] || 'cliente';
+        const updateUser = await supabase.auth.updateUser({ data: { role } });
+        if (updateUser.error) throw new Error(updateUser.error.message);
 
-        const select = document.getElementById('role');
-        const msg = document.getElementById('msg');
-        const dataService = window.DataService;
-        const remoteActive = Boolean(dataService && typeof dataService.isRemote === 'function' ? dataService.isRemote() : window.USE_REMOTE_API);
+        const jwt = session?.access_token;
+        const res = await fetch(API_BASE, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${jwt}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ action: 'set_role', role }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error || 'No se pudo actualizar tu rol en servidor');
 
-        document.getElementById('email').textContent = profile.email || '—';
-        document.getElementById('current').textContent = LABEL_MAP[profile.role] || profile.role || 'Cliente';
-        select.value = LABEL_MAP[profile.role] || 'Cliente';
-
-        document.getElementById('save').onclick = async () => {
-          const label = select.value;
-          msg.textContent = 'Guardando…';
-          msg.className = '';
-          try {
-            const role = ROLE_MAP[label] || 'cliente';
-            const supabaseClient = window.__glcbcSupabase;
-            if (!supabaseClient || !supabaseClient.auth || typeof supabaseClient.auth.updateUser !== 'function') {
-              throw new Error('No se encontró el cliente de Supabase.');
-            }
-            const { error } = await supabaseClient.auth.updateUser({ data: { role } });
-            if (error) {
-              throw new Error(error.message || 'No se pudo actualizar tu rol en Supabase');
-            }
-
-            if (remoteActive && window.Http) {
-              await Http.request('/actions', {
-                method: 'POST',
-                body: {
-                  action: 'users.upsertProfile',
-                  payload: {
-                    id: profile.id,
-                    email: profile.email,
-                    name: profile.name,
-                    role,
-                  },
-                },
-              });
-            } else if (dataService && typeof dataService.dispatch === 'function') {
-              await dataService.dispatch('users.upsertProfile', {
-                id: profile.id,
-                email: profile.email,
-                name: profile.name,
-                role,
-              });
-            }
-
-            profile.role = role;
-            Auth.setProfile({ ...profile });
-            document.getElementById('current').textContent = LABEL_MAP[role] || role;
-            msg.textContent = `✅ Rol actualizado a: ${LABEL_MAP[role] || role}`;
-            msg.className = 'ok';
-          } catch (error) {
-            console.error(error);
-            msg.textContent = error.message || 'No se pudo guardar el rol';
-            msg.className = 'err';
-          }
-        };
+        msg.textContent = `✅ Rol actualizado a: ${role}`; msg.className = 'ok';
+        currentEl.textContent = role;
       } catch (error) {
         console.error(error);
-        document.getElementById('msg').textContent = error.message || 'Error al cargar tu perfil.';
-        document.getElementById('msg').className = 'err';
-        setTimeout(() => (window.location.href = 'login.html'), 2000);
+        msg.textContent = error.message || 'No se pudo guardar el rol'; msg.className = 'err';
       }
-    })();
+    };
   </script>
 </body>
 </html>

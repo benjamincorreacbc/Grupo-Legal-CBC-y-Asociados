@@ -67,14 +67,7 @@
     </footer>
 
     <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
-    <script src="app.js"></script>
-    <script>
-        // Renderizar el contenido de la página de inicio desde localStorage
-        if (typeof renderLanding === 'function') {
-            renderLanding();
-        }
-    </script>
+    <script type="module" src="./js/landing.js"></script>
 </body>
 </html>

@@ -11,26 +11,39 @@
         <div class="auth-card">
             <h2>Iniciar sesión</h2>
             <form id="loginForm">
-  <label for="loginEmail">Correo electrónico</label>
-  <input type="email" id="loginEmail" required />
-  <label for="loginPassword">Contraseña</label>
-  <input type="password" id="loginPassword" required />
-  <button type="submit" class="btn btn-primary">Acceder</button>
-  <p id="status" class="status" style="display:none; margin-top:.75rem; color:#b00020;"></p>
+                <label for="email">Correo electrónico</label>
+                <input type="email" id="email" required />
+                <label for="password">Contraseña</label>
+                <input type="password" id="password" required />
+                <button type="submit" class="btn btn-primary">Acceder</button>
+                <p id="status" class="status" style="display:none; margin-top:.75rem; color:#b00020;"></p>
             </form>
             <p style="margin-top: 1rem; text-align: center; font-size: 0.9rem;">
                 ¿No tienes cuenta? <a href="register.html">Solicitar apertura de cuenta</a>
             </p>
         </div>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
-    <script src="app.js"></script>
-    <script>
-        document.getElementById('loginForm').addEventListener('submit', function (e) {
-            e.preventDefault();
-            loginUser();
-        });
+    <script type="module">
+        import { loginUser } from './js/auth.js';
+
+        const form = document.getElementById('loginForm');
+        const statusEl = document.getElementById('status');
+        if (form) {
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                statusEl.style.display = 'none';
+                const email = document.getElementById('email').value.trim();
+                const password = document.getElementById('password').value;
+                try {
+                    await loginUser(email, password);
+                    window.location.href = './dashboard.html';
+                } catch (error) {
+                    statusEl.textContent = error.message;
+                    statusEl.style.display = 'block';
+                }
+            });
+        }
     </script>
 </body>
 </html>
