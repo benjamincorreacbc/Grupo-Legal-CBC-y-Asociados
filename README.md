@@ -2,6 +2,15 @@
 
 Esta guía explica **paso a paso** cómo usar el proyecto desde cero, sin depender de un computador personal. Todos los servicios sugeridos tienen planes gratuitos o de muy bajo costo y puedes administrarlos desde una tablet o cualquier navegador.
 
+## Resumen express (si vienes de la versión original)
+
+1. **Archivos**: se mantienen `index.html`, `login.html`, `register.html`, `dashboard.html`, `set-role.html`, `style.css` y un único `app.js` que controla la navegación con los mismos botones de la primera versión.
+2. **Autenticación**: el script conserva las funciones globales `window.loginUser`, `window.requestAccount`, `window.requireAuth`, `window.logout` y `window.switchModule`, de modo que cualquier integración anterior seguirá funcionando.
+3. **Configuración rápida**: si aún no creas `config.js`, el portal usa automáticamente la URL de Supabase `https://focxelshnrrvanlnusqf.supabase.co` y la anon key pública que tenías en `main`; así puedes seguir operando mientras preparas tus propias credenciales.
+4. **Módulos**: los formularios y botones de Causas, Calendario, Directorio, Documentos, Reuniones, Honorarios, Chat, Oficinas, Reportes y Configuraciones vuelven a tener listeners listos, pero ahora respetan permisos por rol y estados vacíos consistentes.
+
+Con este resumen puedes reconocer el comportamiento familiar de `main` y, al mismo tiempo, aprovechar las funciones ampliadas de esta rama.
+
 ---
 
 ## 1. Archivos principales del repositorio

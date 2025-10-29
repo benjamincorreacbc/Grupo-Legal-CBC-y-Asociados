@@ -11,8 +11,11 @@
  *   descritas en la guía funcional.
  */
 
-const SUPABASE_URL = window.__GLCBC_SUPABASE_URL__;
-const SUPABASE_ANON_KEY = window.__GLCBC_SUPABASE_ANON_KEY__;
+const FALLBACK_SUPABASE_URL = 'https://focxelshnrrvanlnusqf.supabase.co';
+const FALLBACK_SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZvY3hlbHNobnJydmFubG51c3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEzMTAyNDAsImV4cCI6MjA3Njg4NjI0MH0.VNFpA5hESELQpjKbhZPMPOIGJiX0mV5bJVg5FbtqH1s';
+
+const SUPABASE_URL = window.__GLCBC_SUPABASE_URL__ || FALLBACK_SUPABASE_URL;
+const SUPABASE_ANON_KEY = window.__GLCBC_SUPABASE_ANON_KEY__ || FALLBACK_SUPABASE_ANON;
 const API_BASE = window.__GLCBC_API_BASE__ || '';
 const ORG_SLUG = window.__GLCBC_ORG_SLUG__ || 'glcbc';
 const USE_REMOTE_API = Boolean(API_BASE);
