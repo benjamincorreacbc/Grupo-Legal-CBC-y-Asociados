@@ -48,37 +48,85 @@
     </div>
   </div>
 
-  <!-- Carga la CDN y tu app.js para reutilizar el cliente "sb" -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
   <script src="app.js"></script>
   <script>
+    const ROLE_MAP = {
+      'Admin': 'admin',
+      'Socio Fundador': 'socio_fundador',
+      'Socio Mayorista': 'socio_mayorista',
+      'Socio': 'socio',
+      'Asociado': 'asociado',
+      'Abogado Asociado': 'abogado_asociado',
+      'Cliente': 'cliente',
+    };
+
+    const LABEL_MAP = Object.fromEntries(Object.entries(ROLE_MAP).map(([label, value]) => [value, label]));
+
     (async () => {
-      // Exige sesión
-      const { data: { session } } = await sb.auth.getSession();
-      if (!session) { window.location.href = 'login.html'; return; }
-
-      // Muestra email y rol actual
-      const { data: { user } } = await sb.auth.getUser();
-      document.getElementById('email').textContent = user?.email || '—';
-      const current = user?.user_metadata?.role ?? (Array.isArray(user?.user_metadata?.roles) ? user.user_metadata.roles.join(', ') : '—');
-      document.getElementById('current').textContent = current || '—';
-
-      // Guardar nuevo rol
-      document.getElementById('save').onclick = async () => {
-        const role = document.getElementById('role').value;
-        document.getElementById('msg').textContent = 'Guardando…';
-        document.getElementById('msg').className = '';
-
-        const { error } = await sb.auth.updateUser({ data: { role } });
-        if (error) {
-          document.getElementById('msg').textContent = 'Error: ' + error.message;
-          document.getElementById('msg').className = 'err';
+      try {
+        const profile = await Auth.ensure();
+        if (!profile) {
+          window.location.href = 'login.html';
           return;
         }
-        document.getElementById('msg').textContent = '✅ Rol actualizado a: ' + role;
-        document.getElementById('msg').className = 'ok';
-        document.getElementById('current').textContent = role;
-      };
+        document.getElementById('email').textContent = profile.email;
+        document.getElementById('current').textContent = profile.role || '—';
+        const select = document.getElementById('role');
+        select.value = LABEL_MAP[profile.role] || 'Cliente';
+
+        document.getElementById('save').onclick = async () => {
+          const label = select.value;
+          const msg = document.getElementById('msg');
+          msg.textContent = 'Guardando…';
+          msg.className = '';
+          try {
+            const role = ROLE_MAP[label] || 'cliente';
+            const { error } = await window.__glcbcSupabase.auth.updateUser({ data: { role } });
+            if (error) {
+              throw new Error(error.message || 'No se pudo actualizar tu rol en Supabase');
+            }
+
+            if (window.USE_REMOTE_API) {
+              await Http.request('/actions', {
+                method: 'POST',
+                body: {
+                  action: 'users.upsertProfile',
+                  payload: {
+                    id: profile.id,
+                    email: profile.email,
+                    name: profile.name,
+                    role,
+                  },
+                },
+              });
+            } else if (window.DataService) {
+              await DataService.dispatch('users.upsertProfile', {
+                id: profile.id,
+                email: profile.email,
+                name: profile.name,
+                role,
+              });
+            }
+
+            profile.role = role;
+            Auth.setProfile({ ...profile });
+            msg.textContent = `✅ Rol actualizado a: ${role}`;
+            msg.className = 'ok';
+            document.getElementById('current').textContent = role;
+          } catch (error) {
+            console.error(error);
+            msg.textContent = error.message || 'No se pudo guardar el rol';
+            msg.className = 'err';
+          }
+        };
+      } catch (error) {
+        console.error(error);
+        document.getElementById('msg').textContent = error.message || 'Error al cargar tu perfil.';
+        document.getElementById('msg').className = 'err';
+        setTimeout(() => (window.location.href = 'login.html'), 2000);
+      }
     })();
   </script>
 </body>
