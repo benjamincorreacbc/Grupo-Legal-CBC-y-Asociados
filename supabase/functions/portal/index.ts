@@ -1,83 +1,117 @@
-import { serve } from 'https://deno.land/std@0.204.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2?target=deno';
-import { executeAction } from './actions.ts';
-import { readState } from './stateStore.ts';
-import { filterStateForUser } from './utils.ts';
+// supabase/functions/portal/index.ts
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
-const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-const DEFAULT_SLUG = Deno.env.get('GLCBC_ORG_SLUG') || 'glcbc';
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+};
 
-if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-  throw new Error('Faltan SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY en el entorno.');
-}
-
-const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-  auth: { persistSession: false },
-});
-
-async function resolveUser(request: Request) {
-  const authorization = request.headers.get('authorization');
-  if (!authorization || !authorization.toLowerCase().startsWith('bearer ')) {
-    return null;
-  }
-  const token = authorization.slice(7);
-  const { data, error } = await adminClient.auth.getUser(token);
-  if (error || !data?.user) {
-    return null;
-  }
-  const user = data.user;
-  return {
-    id: user.id,
-    email: user.email,
-    name: (user.user_metadata as any)?.name || user.email || 'Usuario',
-    role: (user.user_metadata as any)?.role || 'cliente',
-    metadata: user.user_metadata,
-  };
-}
-
-function json(data: unknown, init: ResponseInit = {}) {
-  return new Response(JSON.stringify(data), {
+function json(body: unknown, init: ResponseInit = {}) {
+  return new Response(JSON.stringify(body), {
     ...init,
     headers: {
-      'content-type': 'application/json; charset=utf-8',
-      ...init.headers,
+      "Content-Type": "application/json",
+      ...corsHeaders,
+      ...(init.headers || {}),
     },
   });
 }
 
-function errorResponse(message: string, status = 400) {
-  return json({ message }, { status });
+function err(message: string, status = 400) {
+  return json({ error: message }, { status });
 }
 
-serve(async (request) => {
+Deno.serve(async (req) => {
+  // Preflight
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+  const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!SUPABASE_URL || !SERVICE_ROLE) {
+    return err("Faltan SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY", 500);
+  }
+
+  // Cliente admin (para leer/escribir en profiles)
+  const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
+
+  // JWT del usuario
+  const auth = req.headers.get("authorization") || "";
+  const jwt = auth.startsWith("Bearer ") ? auth.slice(7) : undefined;
+
+  const url = new URL(req.url);
+  const path = url.pathname.replace(/\/+$/, ""); // sin barra final
+
   try {
-    const url = new URL(request.url);
-    const pathname = url.pathname.replace(/\/*$/, '');
-    const slug = request.headers.get('x-glcbc-org') || DEFAULT_SLUG;
-    if (request.method === 'GET' && pathname.endsWith('/state')) {
-      const user = await resolveUser(request);
-      if (!user) {
-        return errorResponse('No autorizado', 401);
-      }
-      const { state } = await readState(adminClient, slug);
-      return json({ state: filterStateForUser(state, user) });
+    // Salud
+    if (path.endsWith("/healthz")) return json({ ok: true });
+
+    // Estado inicial
+    if (path.endsWith("/state") && req.method === "GET") {
+      if (!jwt) return err("JWT faltante", 401);
+      const { data: { user }, error } = await admin.auth.getUser(jwt);
+      if (error || !user) return err("Usuario no válido", 401);
+
+      const { data: profile } = await admin
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+
+      return json({
+        ok: true,
+        user: { id: user.id, email: user.email },
+        profile,
+        org: { slug: Deno.env.get("GLCBC_ORG_SLUG") || "glcbc" },
+      });
     }
 
-    if (request.method === 'POST' && pathname.endsWith('/actions')) {
-      const user = await resolveUser(request);
-      const body = await request.json().catch(() => null);
-      if (!body || typeof body.action !== 'string') {
-        return errorResponse('Solicitud inválida', 400);
+    // Acciones
+    if (path.endsWith("/actions") && req.method === "POST") {
+      if (!jwt) return err("JWT faltante", 401);
+      const { data: { user }, error } = await admin.auth.getUser(jwt);
+      if (error || !user) return err("Usuario no válido", 401);
+
+      const body = await req.json().catch(() => ({} as any));
+      const action = body?.action as string;
+      const payload = body?.payload ?? {};
+
+      // Usada por set-role.html
+      if (action === "users.upsertProfile") {
+        const row = {
+          id: payload.id ?? user.id,
+          email: payload.email ?? user.email,
+          name: payload.name ?? null,
+          role: payload.role ?? null,
+          updated_at: new Date().toISOString(),
+        };
+        const { error: upErr } = await admin
+          .from("profiles")
+          .upsert(row, { onConflict: "id" });
+        if (upErr) return err(upErr.message, 400);
+        return json({ ok: true });
       }
-      const result = await executeAction(adminClient, slug, body.action, body.payload ?? {}, { user });
-      return json({ state: filterStateForUser(result, user) });
+
+      // Alternativa: cambiar solo rol
+      if (action === "users.setRole") {
+        const role = payload.role;
+        if (!role) return err("role requerido");
+        const { error: upErr } = await admin
+          .from("profiles")
+          .update({ role })
+          .eq("id", user.id);
+        if (upErr) return err(upErr.message, 400);
+        return json({ ok: true });
+      }
+
+      return err("acción no soportada", 404);
     }
 
-    return errorResponse('Ruta no encontrada', 404);
-  } catch (error) {
-    console.error('Edge function error', error);
-    const message = error instanceof Error ? error.message : 'Error inesperado';
-    return errorResponse(message, 500);
+    // No coincide ninguna ruta
+    return err("not found", 404);
+  } catch (e: any) {
+    return json({ error: e?.message ?? String(e) }, { status: 500 });
   }
 });
