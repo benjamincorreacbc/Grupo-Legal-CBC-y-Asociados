@@ -1,4 +1,4 @@
-project_id = "YOUR-PROJECT-REF"
+project_id = "focxelshnrrvanlnusqf"
 
 [functions.portal]
 verify_jwt = true
