@@ -107,7 +107,7 @@ subdominios automáticos), sigue estos pasos específicos:
    - `SUPABASE_ACCESS_TOKEN`: lo obtienes en Supabase (`Account Settings → Access Tokens`).
    - `SUPABASE_PROJECT_REF`: el identificador de tu proyecto (ejemplo `abcd1234`).
 
-2. A partir de ahora, cada vez que actualices cualquier archivo dentro de `supabase/`, el workflow `deploy-supabase.yml` desplegará la función `portal` automáticamente usando esos secretos. También puedes ejecutarlo manualmente con el botón “Run workflow”.
+2. A partir de ahora, cada vez que actualices cualquier archivo dentro de `supabase/`, el workflow `deploy-supabase.yml` intentará desplegar la función `portal` automáticamente. Si los secretos no están configurados, verás un mensaje de “Supabase deployment skipped…” y la ejecución finalizará en verde; en cuanto agregues ambos secretos, el despliegue se realizará con normalidad. También puedes ejecutarlo manualmente con el botón “Run workflow”.
 
 Todo el ciclo (editar archivos, subir a GitHub, desplegar en Supabase y Cloudflare Pages) se puede hacer desde el navegador.
 
